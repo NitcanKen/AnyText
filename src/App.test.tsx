@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { MARKDOWN_LIMIT_BYTES } from './lib/anytext';
 
@@ -28,6 +28,7 @@ vi.mock('./lib/supabaseClient', () => ({
 vi.mock('./lib/supabaseRelay', () => relayMocks);
 
 beforeEach(() => {
+  vi.useRealTimers();
   localStorage.clear();
   copyTextMock.mockClear();
   vi.clearAllMocks();
@@ -53,6 +54,10 @@ beforeEach(() => {
     onStatusChange('connected');
     return { unsubscribe: vi.fn() };
   });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('AnyText Command Deck app', () => {
@@ -238,5 +243,50 @@ describe('AnyText Command Deck app', () => {
 
     expect(screen.getByText('large.zip is over 25MB.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled();
+  });
+
+  it('hides an expired selected item from the queue while keeping an expired detail state', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-24T12:00:00.000Z'));
+    localStorage.setItem('anytext.roomKey', 'test-room-key');
+    relayMocks.listMessages.mockResolvedValueOnce([
+      {
+        id: 'soon-expired',
+        markdown: '# Expires soon',
+        attachments: [
+          {
+            id: 'file-1',
+            messageId: 'soon-expired',
+            fileName: 'brief.pdf',
+            fileType: 'PDF',
+            mimeType: 'application/pdf',
+            fileSize: 4,
+            previewKind: 'download',
+            objectUrl: 'https://storage.example/signed/brief.pdf',
+          },
+        ],
+        senderDeviceName: 'MacBook',
+        createdAt: '2026-06-24T11:59:00.000Z',
+        expiresAt: '2026-06-24T12:00:10.000Z',
+      },
+    ]);
+
+    render(<App />);
+
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: /expires soon/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /download/i })).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+
+    expect(screen.queryByRole('button', { name: /expires soon/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/message expired/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /expired/i })).toBeDisabled();
   });
 });

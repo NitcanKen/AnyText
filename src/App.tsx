@@ -27,6 +27,7 @@ import {
   type DragEvent,
   type KeyboardEvent,
   type RefObject,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -209,7 +210,12 @@ function App() {
 
   const markdownValidation = useMemo(() => validateMarkdown(markdown), [markdown]);
   const activeItems = useMemo(() => getActiveQueueItems(queueItems, now), [queueItems, now]);
-  const selectedItem = activeItems.find((item) => item.id === selectedId) ?? activeItems[0] ?? null;
+  const selectedStoredItem = useMemo(
+    () => (selectedId ? queueItems.find((item) => item.id === selectedId && !item.deletedAt) ?? null : null),
+    [queueItems, selectedId],
+  );
+  const selectedItem = selectedStoredItem ?? activeItems[0] ?? null;
+  const selectedItemExpired = selectedStoredItem ? getItemTimeState(selectedStoredItem.expiresAt, now).expired : false;
   const hasDraftContent = markdown.trim().length > 0 || attachments.length > 0;
   const sendDisabled =
     sendState === 'sending' ||
@@ -453,12 +459,14 @@ function App() {
               backendError={backendError}
               now={now}
               onCopyMarkdown={copyMarkdown}
+              onClearSelection={() => setSelectedId(null)}
               onDeleteMessage={deleteMessage}
               onImagePreview={setImagePreview}
               onRefresh={refreshQueue}
               onSelect={setSelectedId}
               queueStatus={queueStatus}
               selectedItem={selectedItem}
+              selectedItemExpired={selectedItemExpired}
               syncStatus={syncStatus}
             />
           </section>
@@ -552,6 +560,76 @@ function TopBar({
 }: TopBarProps) {
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(deviceName);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const closeMenu = useCallback(
+    (restoreFocus = true) => {
+      onMenuOpenChange(false);
+
+      if (restoreFocus) {
+        window.setTimeout(() => triggerRef.current?.focus(), 0);
+      }
+    },
+    [onMenuOpenChange],
+  );
+
+  useEffect(() => {
+    if (!menuOpen) {
+      return;
+    }
+
+    const focusTimer = window.setTimeout(() => {
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"], input')?.focus();
+    }, 0);
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (menuRef.current?.contains(target) || triggerRef.current?.contains(target)) {
+        return;
+      }
+
+      closeMenu();
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('pointerdown', handlePointerDown);
+    };
+  }, [closeMenu, menuOpen]);
+
+  function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const focusable = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"], input') ?? []);
+    const currentIndex = focusable.findIndex((element) => element === document.activeElement);
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu();
+      return;
+    }
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const direction = event.key === 'ArrowDown' ? 1 : -1;
+      const nextIndex = currentIndex === -1 ? 0 : (currentIndex + direction + focusable.length) % focusable.length;
+      focusable[nextIndex]?.focus();
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      focusable[0]?.focus();
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      focusable.at(-1)?.focus();
+    }
+  }
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#070a0c]/95 backdrop-blur">
@@ -571,8 +649,13 @@ function TopBar({
         <div className="relative">
           <button
             aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label="Open room menu"
+            aria-controls="room-menu"
             className="room-trigger"
             onClick={() => onMenuOpenChange(!menuOpen)}
+            ref={triggerRef}
+            title="Room menu"
             type="button"
           >
             <span className="hidden max-w-[160px] truncate sm:inline">{deviceName}</span>
@@ -582,18 +665,34 @@ function TopBar({
 
           {menuOpen ? (
             <div
+              aria-label="Room menu"
               className="room-menu"
-              onKeyDown={(event: KeyboardEvent<HTMLDivElement>) => {
-                if (event.key === 'Escape') {
-                  onMenuOpenChange(false);
-                }
-              }}
+              id="room-menu"
+              onKeyDown={handleMenuKeyDown}
+              ref={menuRef}
+              role="menu"
             >
-              <button className="menu-item" onClick={onCopyJoinLink} type="button">
+              <button
+                className="menu-item"
+                onClick={() => {
+                  onCopyJoinLink();
+                  closeMenu();
+                }}
+                role="menuitem"
+                type="button"
+              >
                 <IconLink aria-hidden size={16} />
                 <span>Copy join link</span>
               </button>
-              <button className="menu-item" onClick={onShowPairing} type="button">
+              <button
+                className="menu-item"
+                onClick={() => {
+                  onShowPairing();
+                  closeMenu();
+                }}
+                role="menuitem"
+                type="button"
+              >
                 <IconQrcode aria-hidden size={16} />
                 <span>Show QR</span>
               </button>
@@ -607,6 +706,7 @@ function TopBar({
                     if (nextName) {
                       onRenameDevice(nextName);
                       setRenaming(false);
+                      closeMenu();
                     }
                   }}
                 >
@@ -626,13 +726,13 @@ function TopBar({
                   </div>
                 </form>
               ) : (
-                <button className="menu-item" onClick={() => setRenaming(true)} type="button">
+                <button className="menu-item" onClick={() => setRenaming(true)} role="menuitem" type="button">
                   <IconEdit aria-hidden size={16} />
                   <span>Rename device</span>
                 </button>
               )}
               <div className="my-1 border-t border-white/10" />
-              <button className="menu-item menu-item-danger" onClick={onResetBrowser} type="button">
+              <button className="menu-item menu-item-danger" onClick={onResetBrowser} role="menuitem" type="button">
                 <IconTrash aria-hidden size={16} />
                 <span>Reset this browser</span>
               </button>
@@ -895,12 +995,14 @@ interface QueuePanelProps {
   backendError: string;
   now: Date;
   onCopyMarkdown: (markdown: string) => Promise<void>;
+  onClearSelection: () => void;
   onDeleteMessage: (id: string) => void;
   onImagePreview: (attachment: QueueAttachment) => void;
   onRefresh: () => void;
   onSelect: (id: string) => void;
   queueStatus: QueueStatus;
   selectedItem: QueueItem | null;
+  selectedItemExpired: boolean;
   syncStatus: SyncStatus;
 }
 
@@ -909,14 +1011,34 @@ function QueuePanel({
   backendError,
   now,
   onCopyMarkdown,
+  onClearSelection,
   onDeleteMessage,
   onImagePreview,
   onRefresh,
   onSelect,
   queueStatus,
   selectedItem,
+  selectedItemExpired,
   syncStatus,
 }: QueuePanelProps) {
+  const [mobileDetailItemId, setMobileDetailItemId] = useState<string | null>(null);
+  const mobileDetailItem = selectedItem?.id === mobileDetailItemId ? selectedItem : null;
+
+  function selectItem(id: string) {
+    onSelect(id);
+    setMobileDetailItemId(id);
+  }
+
+  function closeMobileDetail() {
+    setMobileDetailItemId(null);
+    onClearSelection();
+  }
+
+  function deleteMessage(id: string) {
+    setMobileDetailItemId(null);
+    onDeleteMessage(id);
+  }
+
   return (
     <section className="panel flex min-h-[calc(100dvh-160px)] flex-col overflow-hidden">
       <div className="panel-header">
@@ -958,8 +1080,8 @@ function QueuePanel({
                   item={item}
                   key={item.id}
                   now={now}
-                  onDelete={onDeleteMessage}
-                  onSelect={onSelect}
+                  onDelete={deleteMessage}
+                  onSelect={selectItem}
                   selected={selectedItem?.id === item.id}
                 />
               ))}
@@ -967,13 +1089,14 @@ function QueuePanel({
           ) : null}
         </div>
 
-        <div className="min-h-0 overflow-y-auto">
+        <div className="hidden min-h-0 overflow-y-auto md:block">
           {selectedItem ? (
             <MessageDetail
+              expired={selectedItemExpired}
               item={selectedItem}
               now={now}
               onCopyMarkdown={onCopyMarkdown}
-              onDeleteMessage={onDeleteMessage}
+              onDeleteMessage={deleteMessage}
               onImagePreview={onImagePreview}
             />
           ) : (
@@ -983,6 +1106,22 @@ function QueuePanel({
           )}
         </div>
       </div>
+
+      {mobileDetailItem ? (
+        <div className="mobile-detail-backdrop md:hidden" onClick={closeMobileDetail} role="presentation">
+          <div className="mobile-detail-sheet" onClick={(event) => event.stopPropagation()}>
+            <MessageDetail
+              expired={selectedItemExpired}
+              item={mobileDetailItem}
+              now={now}
+              onClose={closeMobileDetail}
+              onCopyMarkdown={onCopyMarkdown}
+              onDeleteMessage={deleteMessage}
+              onImagePreview={onImagePreview}
+            />
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -1041,7 +1180,7 @@ function QueueRow({ item, now, onDelete, onSelect, selected }: QueueRowProps) {
 
   return (
     <div className={cx('queue-row-group', selected && 'queue-row-selected')}>
-      <button className="queue-row" onClick={() => onSelect(item.id)} type="button">
+      <button className="queue-row" onClick={() => onSelect(item.id)} title="Open queue item" type="button">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-100">{excerpt}</p>
@@ -1069,7 +1208,13 @@ function QueueRow({ item, now, onDelete, onSelect, selected }: QueueRowProps) {
           <span>{new Date(item.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         </div>
       </button>
-      <button aria-label="Delete queue item" className="queue-delete" onClick={() => onDelete(item.id)} type="button">
+      <button
+        aria-label="Delete queue item"
+        className="queue-delete"
+        onClick={() => onDelete(item.id)}
+        title="Delete queue item"
+        type="button"
+      >
         <IconTrash aria-hidden size={15} />
       </button>
     </div>
@@ -1077,16 +1222,19 @@ function QueueRow({ item, now, onDelete, onSelect, selected }: QueueRowProps) {
 }
 
 interface MessageDetailProps {
+  expired?: boolean;
   item: QueueItem;
   now: Date;
+  onClose?: () => void;
   onCopyMarkdown: (markdown: string) => Promise<void>;
   onDeleteMessage: (id: string) => void;
   onImagePreview: (attachment: QueueAttachment) => void;
 }
 
-function MessageDetail({ item, now, onCopyMarkdown, onDeleteMessage, onImagePreview }: MessageDetailProps) {
+function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, onDeleteMessage, onImagePreview }: MessageDetailProps) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const timeState = getItemTimeState(item.expiresAt, now);
+  const isExpired = expired || timeState.expired;
 
   async function copyMarkdown() {
     try {
@@ -1118,10 +1266,15 @@ function MessageDetail({ item, now, onCopyMarkdown, onDeleteMessage, onImagePrev
             <IconTrash aria-hidden size={15} />
             Delete message
           </button>
+          {onClose ? (
+            <button aria-label="Close message detail" className="icon-button" onClick={onClose} title="Close detail" type="button">
+              <IconX aria-hidden size={16} />
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {timeState.expired ? <InlineAlert message="Message expired." /> : null}
+      {isExpired ? <InlineAlert message="Message expired. It is hidden from the queue and downloads are disabled." /> : null}
 
       {item.markdown ? <MarkdownPreview markdown={item.markdown} /> : null}
 
@@ -1131,9 +1284,9 @@ function MessageDetail({ item, now, onCopyMarkdown, onDeleteMessage, onImagePrev
           <div className="grid gap-3 2xl:grid-cols-2">
             {item.attachments.map((attachment) =>
               attachment.previewKind === 'image' ? (
-                <ImageAttachment key={attachment.id} attachment={attachment} onPreview={onImagePreview} />
+                <ImageAttachment disabled={isExpired} key={attachment.id} attachment={attachment} onPreview={onImagePreview} />
               ) : (
-                <FileDownloadRow attachment={attachment} key={attachment.id} />
+                <FileDownloadRow attachment={attachment} disabled={isExpired} key={attachment.id} />
               ),
             )}
           </div>
@@ -1145,13 +1298,21 @@ function MessageDetail({ item, now, onCopyMarkdown, onDeleteMessage, onImagePrev
 
 function ImageAttachment({
   attachment,
+  disabled,
   onPreview,
 }: {
   attachment: QueueAttachment;
+  disabled: boolean;
   onPreview: (attachment: QueueAttachment) => void;
 }) {
   return (
-    <button className="image-attachment" onClick={() => onPreview(attachment)} type="button">
+    <button
+      className="image-attachment"
+      disabled={disabled}
+      onClick={() => onPreview(attachment)}
+      title={disabled ? 'Preview expired' : 'Open image preview'}
+      type="button"
+    >
       <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-black/25">
         {attachment.objectUrl ? (
           <img alt="" className="h-full w-full object-cover" src={attachment.objectUrl} />
@@ -1169,7 +1330,7 @@ function ImageAttachment({
   );
 }
 
-function FileDownloadRow({ attachment }: { attachment: QueueAttachment }) {
+function FileDownloadRow({ attachment, disabled }: { attachment: QueueAttachment; disabled: boolean }) {
   return (
     <div className="file-row">
       <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-white/10 bg-black/25">
@@ -1181,15 +1342,15 @@ function FileDownloadRow({ attachment }: { attachment: QueueAttachment }) {
           {formatBytes(attachment.fileSize)} · {attachment.mimeType || attachment.fileType}
         </p>
       </div>
-      {attachment.objectUrl ? (
+      {attachment.objectUrl && !disabled ? (
         <a className="secondary-button" download={attachment.fileName} href={attachment.objectUrl}>
           <IconDownload aria-hidden size={15} />
           Download
         </a>
       ) : (
-        <button className="secondary-button" type="button">
+        <button className="secondary-button" disabled type="button">
           <IconDownload aria-hidden size={15} />
-          Download
+          {disabled ? 'Expired' : 'Download'}
         </button>
       )}
     </div>
@@ -1199,13 +1360,13 @@ function FileDownloadRow({ attachment }: { attachment: QueueAttachment }) {
 function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachment; onClose: () => void }) {
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
-      <div className="modal-panel" onClick={(event) => event.stopPropagation()}>
+      <div aria-label="Image preview" aria-modal="true" className="modal-panel" onClick={(event) => event.stopPropagation()} role="dialog">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{attachment.fileName}</p>
             <p className="font-mono text-[11px] text-slate-500">{formatBytes(attachment.fileSize)}</p>
           </div>
-          <button aria-label="Close image preview" className="icon-button" onClick={onClose} type="button">
+          <button aria-label="Close image preview" className="icon-button" onClick={onClose} title="Close image preview" type="button">
             <IconX aria-hidden size={16} />
           </button>
         </div>

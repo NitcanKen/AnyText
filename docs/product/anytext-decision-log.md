@@ -214,3 +214,42 @@ Known follow-up:
 
 - A scheduled physical Storage cleanup job is still needed for expired/deleted rows with `cleanup_pending = true`.
 - Production build still emits the non-failing Tabler barrel/chunk-size warning noted in earlier goals.
+
+## Implementation Note: MVP Expiry, Cleanup, UX Polish, and Deploy Prep
+
+Implemented on 2026-06-25:
+
+- Added a deployable physical cleanup path:
+  - `anytext_cleanup_attachment_candidates(p_limit)` returns expired/deleted/cleanup-pending attachment storage paths for the service role only.
+  - `anytext-cleanup-expired` Edge Function deletes matching Storage objects, then calls `anytext_cleanup_finalize(p_attachment_ids)` to delete attachment records and expired/deleted messages with no remaining attachments.
+  - The cleanup function requires `ANYTEXT_CLEANUP_TOKEN` and is intended to be scheduled server-side, not called from the browser.
+- Preserved the user-facing expiry contract:
+  - Normal queue lists continue to hide expired/deleted items.
+  - If an item is already open when it expires, the detail remains visible with an expired state and disabled downloads.
+  - Added component coverage for selected-item expiry behavior.
+- Improved Command Deck UX/accessibility:
+  - Room menu now supports Escape, outside-click close, focus return, menu roles, and arrow/Home/End keyboard navigation.
+  - Mobile queue item selection opens a bottom detail sheet instead of relying on the desktop inline detail region.
+  - Queue rows, mobile sheet, drag-over state, and new-item entry have restrained motion with the existing reduced-motion override.
+  - Delete and icon-only controls have stronger touch/focus affordances, labels, and native tooltips where useful.
+- Added GitHub Pages deploy preparation:
+  - `.github/workflows/deploy-pages.yml` runs `npm run lint`, `npm test`, and `npm run build`, then deploys `dist` through GitHub Pages.
+  - `README.md` documents local setup, Supabase migrations/functions, cleanup scheduling, GitHub Pages variables/secrets, and MVP acceptance checks.
+  - `.env.example` now includes the cleanup invocation token placeholder. No service role key or real secret was committed.
+
+Verification completed so far:
+
+- `npm test -- --run src/App.test.tsx` passed after adding the selected-expiry component test.
+- `npm run lint && npm test && npm run build` passed before the docs/deploy additions in this goal.
+- `npm run lint && npm test && npm run build` passed again after the docs/deploy/code edits in this goal; Vitest covered 5 files and 31 tests.
+- `supabase db push --yes` applied migration `20260625013000_anytext_cleanup_expired.sql` to project `cizmpumlliowigimhwqr`.
+- `supabase functions deploy anytext-cleanup-expired --no-verify-jwt` deployed the cleanup Edge Function.
+- Real cleanup smoke verified shortened expiry with a real uploaded attachment: target attachment row remaining `0`, target message row remaining `0`, and target Storage objects remaining `0` after cleanup.
+- In-app Browser verification covered desktop page identity, nonblank Command Deck rendering, no framework overlay, clean console, exact raw Markdown clipboard copy, exact bash code block copy, room menu Arrow/Escape navigation with focus return, mobile Queue tab, mobile bottom detail sheet, and no mobile horizontal overflow.
+- Headless Chrome/CDP verification with two isolated browser profiles covered: fresh room creation, second browser join by room link, refresh persistence, Markdown plus image/PDF upload, receiver rendering, image modal signed URL fetch HTTP 200, PDF signed download URL fetch HTTP 200, receiver delete syncing back to sender, shortened-expiry item hidden after refresh, reduced-motion media emulation, and 390px mobile tabs without horizontal overflow.
+- Cleanup was invoked again after browser tests to remove smoke messages and Storage objects left by failed intermediate CDP attempts.
+- Final `npm run lint && npm test && npm run build` passed after all tracked docs/config/code edits; Vitest covered 5 files and 31 tests.
+
+Remaining verification before declaring the full MVP goal complete:
+
+- Push to `main` and verify GitHub Pages deployment or report the exact external permission/settings blocker.

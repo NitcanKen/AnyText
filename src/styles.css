@@ -118,6 +118,7 @@ a:focus-visible {
   .dropzone-active {
     border-color: rgba(190, 252, 60, 0.65);
     background: rgba(190, 252, 60, 0.08);
+    transform: translateY(-1px);
   }
 
   .dropzone-disabled {
@@ -150,6 +151,11 @@ a:focus-visible {
   .image-attachment:hover {
     border-color: rgba(190, 252, 60, 0.35);
     background: rgba(190, 252, 60, 0.06);
+  }
+
+  .image-attachment:disabled {
+    cursor: not-allowed;
+    opacity: 0.58;
   }
 
   .send-button {
@@ -264,6 +270,7 @@ a:focus-visible {
     position: absolute;
     top: calc(100% + 0.5rem);
     right: 0;
+    z-index: 30;
     width: min(320px, calc(100vw - 1.5rem));
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -285,6 +292,10 @@ a:focus-visible {
 
   .menu-item:hover {
     background: rgba(255, 255, 255, 0.06);
+  }
+
+  .menu-item:focus-visible {
+    background: rgba(190, 252, 60, 0.08);
   }
 
   .menu-item-danger {
@@ -353,6 +364,7 @@ a:focus-visible {
   .queue-row-group {
     position: relative;
     margin-bottom: 0.5rem;
+    animation: queue-in 180ms ease both;
   }
 
   .queue-row {
@@ -374,15 +386,19 @@ a:focus-visible {
     background: rgba(190, 252, 60, 0.07);
   }
 
+  .queue-row:active {
+    transform: scale(0.99);
+  }
+
   .queue-delete {
     position: absolute;
-    right: 0.45rem;
-    bottom: 0.45rem;
+    right: 0.25rem;
+    bottom: 0.25rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 40px;
+    height: 40px;
     border-radius: 6px;
     color: #94a3b8;
   }
@@ -410,6 +426,27 @@ a:focus-visible {
     border-radius: 8px;
     background: #101518;
     padding: 1rem;
+  }
+
+  .mobile-detail-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    display: flex;
+    align-items: flex-end;
+    background: rgba(0, 0, 0, 0.62);
+  }
+
+  .mobile-detail-sheet {
+    width: 100%;
+    max-height: 88dvh;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    background: #101518;
+    box-shadow: 0 -24px 90px rgba(0, 0, 0, 0.48);
+    animation: sheet-in 180ms ease both;
   }
 }
 
@@ -512,6 +549,30 @@ a:focus-visible {
   from {
     opacity: 0;
     transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes queue-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
   }
 
   to {
