@@ -21,6 +21,7 @@ import {
   IconUpload,
   IconX,
 } from '@tabler/icons-react';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   type ChangeEvent,
   type DragEvent,
@@ -33,27 +34,37 @@ import {
 } from 'react';
 import { MarkdownPreview } from './components/MarkdownPreview';
 import {
-  ATTACHMENT_LIMITS,
   MARKDOWN_LIMIT_BYTES,
   type AttachmentPreviewKind,
   type QueueAttachment,
   type QueueItem,
-  classifyAttachment,
-  createMockQueueItem,
   formatBytes,
   formatTimeRemaining,
   generateRoomKey,
   getActiveQueueItems,
   getItemTimeState,
-  hashRoomKey,
-  validateAttachments,
   validateMarkdown,
 } from './lib/anytext';
 import { copyText } from './lib/clipboard';
 import { cx } from './lib/cx';
-
-const ROOM_KEY_STORAGE = 'anytext.roomKey';
-const DEVICE_NAME_STORAGE = 'anytext.deviceName';
+import {
+  clearRoomKey,
+  getInitialDeviceName,
+  getInitialRoomKey,
+  saveDeviceName,
+  saveRoomKey,
+  buildJoinLink,
+} from './lib/pairing';
+import { getSupabaseClient, isSupabaseConfigured } from './lib/supabaseClient';
+import {
+  applyMessageRealtimeEvent,
+  createMessage as createSupabaseMessage,
+  createRoom,
+  deleteMessage as deleteSupabaseMessage,
+  listMessages,
+  subscribeToRoomMessages,
+  type RealtimeStatus,
+} from './lib/supabaseRelay';
 
 interface SelectedAttachment {
   id: string;
@@ -65,11 +76,12 @@ interface SelectedAttachment {
 type SendState = 'idle' | 'sending' | 'sent' | 'failed';
 type QueueStatus = 'idle' | 'loading' | 'error';
 type MobileTab = 'send' | 'queue';
+type SyncStatus = 'connecting' | RealtimeStatus;
 
 function App() {
-  const [roomKey, setRoomKey] = useState(() => localStorage.getItem(ROOM_KEY_STORAGE) ?? '');
+  const [roomKey, setRoomKey] = useState(getInitialRoomKey);
   const [roomId, setRoomId] = useState('');
-  const [deviceName, setDeviceName] = useState(() => localStorage.getItem(DEVICE_NAME_STORAGE) ?? 'MacBook');
+  const [deviceName, setDeviceName] = useState(getInitialDeviceName);
   const [showPairing, setShowPairing] = useState(false);
   const [markdown, setMarkdown] = useState('');
   const [attachments, setAttachments] = useState<SelectedAttachment[]>([]);
@@ -82,6 +94,8 @@ function App() {
   const [imagePreview, setImagePreview] = useState<QueueAttachment | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
+  const [backendError, setBackendError] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -96,17 +110,64 @@ function App() {
     }
 
     let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-    hashRoomKey(roomKey).then((hash) => {
-      if (!cancelled) {
-        setRoomId(hash);
+    async function connectRoom() {
+      if (!isSupabaseConfigured()) {
+        setQueueStatus('error');
+        setSyncStatus('disconnected');
+        setBackendError('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+        return;
       }
-    });
+
+      setQueueStatus('loading');
+      setSyncStatus('connecting');
+      setBackendError('');
+
+      try {
+        const client = getSupabaseClient();
+        const room = await createRoom(client, roomKey, deviceName);
+        const items = await listMessages(client, roomKey);
+
+        if (cancelled) {
+          return;
+        }
+
+        setRoomId(room.roomId);
+        setQueueItems(items);
+        setSelectedId((current) => current ?? items[0]?.id ?? null);
+        setQueueStatus('idle');
+
+        const subscription = await subscribeToRoomMessages(client, roomKey, {
+          onEvent: (event) => {
+            if (!cancelled) {
+              setQueueItems((currentItems) => applyMessageRealtimeEvent(currentItems, event));
+            }
+          },
+          onStatusChange: (status) => {
+            if (!cancelled) {
+              setSyncStatus(status);
+            }
+          },
+        });
+
+        unsubscribe = subscription.unsubscribe;
+      } catch (error) {
+        if (!cancelled) {
+          setQueueStatus('error');
+          setSyncStatus('disconnected');
+          setBackendError(getErrorMessage(error));
+        }
+      }
+    }
+
+    void connectRoom();
 
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
-  }, [roomKey]);
+  }, [deviceName, roomKey]);
 
   useEffect(() => {
     function closeOnEscape(event: globalThis.KeyboardEvent) {
@@ -126,9 +187,10 @@ function App() {
   const selectedItem = activeItems.find((item) => item.id === selectedId) ?? activeItems[0] ?? null;
   const sendDisabled =
     sendState === 'sending' ||
+    !isSupabaseConfigured() ||
     !markdownValidation.valid ||
     attachmentErrors.length > 0 ||
-    (markdown.trim().length === 0 && attachments.length === 0);
+    markdown.trim().length === 0;
   const joinLink = roomKey ? buildJoinLink(roomKey) : '';
 
   if (!roomKey) {
@@ -136,7 +198,7 @@ function App() {
       <FirstRunScreen
         onCreate={() => {
           const key = generateRoomKey();
-          localStorage.setItem(ROOM_KEY_STORAGE, key);
+          saveRoomKey(key);
           setRoomKey(key);
           setShowPairing(true);
         }}
@@ -147,7 +209,7 @@ function App() {
             return;
           }
 
-          localStorage.setItem(ROOM_KEY_STORAGE, trimmedKey);
+          saveRoomKey(trimmedKey);
           setRoomKey(trimmedKey);
           setShowPairing(false);
         }}
@@ -156,26 +218,18 @@ function App() {
   }
 
   function addFiles(files: File[]) {
-    const candidateFiles = [...attachments.map((attachment) => attachment.file), ...files];
-    const errors = validateAttachments(candidateFiles);
-
-    setAttachmentErrors(errors);
-
-    if (errors.length > 0) {
-      const validFiles = candidateFiles
-        .filter((file) => file.size <= ATTACHMENT_LIMITS.maxFileBytes)
-        .slice(0, ATTACHMENT_LIMITS.maxCount);
-      setAttachments(validFiles.map(createSelectedAttachment));
+    if (files.length === 0) {
       return;
     }
 
-    setAttachments(candidateFiles.map(createSelectedAttachment));
+    setAttachments([]);
+    setAttachmentErrors(['Attachments are paused for this text-only Supabase relay build.']);
   }
 
   function removeAttachment(id: string) {
     const nextAttachments = attachments.filter((attachment) => attachment.id !== id);
     setAttachments(nextAttachments);
-    setAttachmentErrors(validateAttachments(nextAttachments.map((attachment) => attachment.file)));
+    setAttachmentErrors([]);
   }
 
   async function sendMessage() {
@@ -186,52 +240,62 @@ function App() {
     setSendState('sending');
 
     try {
-      await delay(260);
-
-      const item = createMockQueueItem({
-        markdown,
-        files: attachments.map((attachment) => attachment.file),
-        senderDeviceName: deviceName,
+      const item = await createSupabaseMessage(getSupabaseClient(), roomKey, markdown, deviceName, {
+        attachments: attachments.map((attachment) => attachment.file),
       });
-      const enrichedItem: QueueItem = {
-        ...item,
-        attachments: item.attachments.map((attachment, index) => ({
-          ...attachment,
-          objectUrl: attachments[index]?.objectUrl,
-        })),
-      };
-
-      setQueueItems((items) => [enrichedItem, ...items]);
-      setSelectedId(enrichedItem.id);
+      setQueueItems((items) => getActiveQueueItems([item, ...items]));
+      setSelectedId(item.id);
       setMarkdown('');
       setAttachments([]);
       setAttachmentErrors([]);
       setSendState('sent');
       setActiveTab('queue');
       window.setTimeout(() => setSendState('idle'), 1200);
-    } catch {
+    } catch (error) {
+      setBackendError(getErrorMessage(error));
       setSendState('failed');
     }
   }
 
-  function deleteMessage(id: string) {
-    setQueueItems((items) =>
-      items.map((item) => (item.id === id ? { ...item, deletedAt: new Date().toISOString() } : item)),
-    );
-    setSelectedId(null);
+  async function deleteMessage(id: string) {
+    try {
+      await deleteSupabaseMessage(getSupabaseClient(), roomKey, id);
+      setQueueItems((items) => items.filter((item) => item.id !== id));
+      setSelectedId(null);
+    } catch (error) {
+      setQueueStatus('error');
+      setBackendError(getErrorMessage(error));
+    }
   }
 
   async function copyMarkdown(value: string) {
     await copyText(value);
   }
 
-  function refreshQueue() {
+  async function refreshQueue() {
+    if (!isSupabaseConfigured()) {
+      setQueueStatus('error');
+      setSyncStatus('disconnected');
+      setBackendError('Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+      return;
+    }
+
     setQueueStatus('loading');
-    window.setTimeout(() => setQueueStatus('idle'), 500);
+
+    try {
+      const items = await listMessages(getSupabaseClient(), roomKey);
+      setQueueItems(items);
+      setSelectedId((current) => (current && items.some((item) => item.id === current) ? current : items[0]?.id ?? null));
+      setQueueStatus('idle');
+      setBackendError('');
+    } catch (error) {
+      setQueueStatus('error');
+      setBackendError(getErrorMessage(error));
+    }
   }
 
   function resetBrowser() {
-    localStorage.removeItem(ROOM_KEY_STORAGE);
+    clearRoomKey();
     setRoomKey('');
     setRoomId('');
     setQueueItems([]);
@@ -248,12 +312,13 @@ function App() {
         onCopyJoinLink={() => copyMarkdown(joinLink)}
         onMenuOpenChange={setMenuOpen}
         onRenameDevice={(name) => {
-          localStorage.setItem(DEVICE_NAME_STORAGE, name);
+          saveDeviceName(name);
           setDeviceName(name);
         }}
         onResetBrowser={resetBrowser}
         onShowPairing={() => setShowPairing(true)}
         roomId={roomId}
+        syncStatus={syncStatus}
       />
 
       <main className="mx-auto flex w-full max-w-[1480px] flex-1 flex-col gap-3 px-3 pb-3 md:px-4 md:pb-4">
@@ -293,6 +358,7 @@ function App() {
             <Composer
               attachmentErrors={attachmentErrors}
               attachments={attachments}
+              backendError={backendError}
               fileInputRef={fileInputRef}
               markdown={markdown}
               markdownValidation={markdownValidation}
@@ -308,6 +374,7 @@ function App() {
           <section className={cx('min-h-0 md:block', activeTab === 'queue' ? 'block' : 'hidden md:block')}>
             <QueuePanel
               activeItems={activeItems}
+              backendError={backendError}
               now={now}
               onCopyMarkdown={copyMarkdown}
               onDeleteMessage={deleteMessage}
@@ -316,6 +383,7 @@ function App() {
               onSelect={setSelectedId}
               queueStatus={queueStatus}
               selectedItem={selectedItem}
+              syncStatus={syncStatus}
             />
           </section>
         </div>
@@ -391,6 +459,7 @@ interface TopBarProps {
   onResetBrowser: () => void;
   onShowPairing: () => void;
   roomId: string;
+  syncStatus: SyncStatus;
 }
 
 function TopBar({
@@ -403,6 +472,7 @@ function TopBar({
   onResetBrowser,
   onShowPairing,
   roomId,
+  syncStatus,
 }: TopBarProps) {
   const [renaming, setRenaming] = useState(false);
   const [draftName, setDraftName] = useState(deviceName);
@@ -417,7 +487,7 @@ function TopBar({
           <div className="min-w-0">
             <div className="text-sm font-semibold tracking-tight">AnyText</div>
             <div className="truncate font-mono text-[11px] text-slate-500">
-              room {roomId ? roomId.slice(0, 10) : 'hashing'} · local mock
+              room {roomId ? roomId.slice(0, 10) : 'syncing'} · {syncStatusLabel(syncStatus)}
             </div>
           </div>
         </div>
@@ -512,16 +582,22 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink }: PairingC
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold">Pairing QR visible</h2>
-          <p className="mt-1 text-sm text-slate-400">Use this placeholder until real QR generation lands with backend pairing.</p>
+          <p className="mt-1 text-sm text-slate-400">Scan this code or use the manual pairing key on another browser.</p>
         </div>
         <button aria-label="Close pairing panel" className="icon-button" onClick={onClose} type="button">
           <IconX aria-hidden size={16} />
         </button>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[112px_1fr]">
-        <div className="qr-placeholder">
-          <IconQrcode aria-hidden size={48} stroke={1.5} />
-          <span>QR</span>
+        <div className="qr-placeholder" aria-label="Pairing QR code">
+          <QRCodeSVG
+            bgColor="transparent"
+            fgColor="#befc3c"
+            level="M"
+            marginSize={1}
+            size={96}
+            value={joinLink}
+          />
         </div>
         <div className="min-w-0 space-y-3">
           <div>
@@ -544,6 +620,7 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink }: PairingC
 interface ComposerProps {
   attachmentErrors: string[];
   attachments: SelectedAttachment[];
+  backendError: string;
   fileInputRef: RefObject<HTMLInputElement | null>;
   markdown: string;
   markdownValidation: { valid: boolean; bytes: number; message?: string };
@@ -558,6 +635,7 @@ interface ComposerProps {
 function Composer({
   attachmentErrors,
   attachments,
+  backendError,
   fileInputRef,
   markdown,
   markdownValidation,
@@ -581,11 +659,11 @@ function Composer({
       <div className="panel-header">
         <div>
           <p className="label">Compose</p>
-          <h2 className="text-lg font-semibold tracking-tight">Send Markdown and attachments</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Send Markdown</h2>
         </div>
         <div className="status-pill">
           <IconClipboard aria-hidden size={14} />
-          manual
+          text relay
         </div>
       </div>
 
@@ -618,7 +696,7 @@ function Composer({
         {markdownValidation.message ? <InlineAlert message={markdownValidation.message} /> : null}
 
         <div
-          className={cx('dropzone', dragging && 'dropzone-active')}
+          className={cx('dropzone dropzone-disabled', dragging && 'dropzone-active')}
           onDragLeave={() => setDragging(false)}
           onDragOver={(event) => {
             event.preventDefault();
@@ -629,6 +707,7 @@ function Composer({
           <input
             aria-label="Select attachments"
             className="sr-only"
+            disabled
             multiple
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               onAddFiles(Array.from(event.target.files ?? []));
@@ -639,10 +718,12 @@ function Composer({
           />
           <IconUpload aria-hidden className="text-lime-200" size={18} />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-medium text-slate-100">{dragging ? 'Drop files to attach' : 'Drop or select files'}</p>
-            <p className="text-xs text-slate-500">Up to 10 files, 25MB each. Images preview, documents download.</p>
+            <p className="text-sm font-medium text-slate-100">
+              {dragging ? 'Attachments are paused' : 'Attachments paused for this phase'}
+            </p>
+            <p className="text-xs text-slate-500">Supabase text relay is active. File upload/download lands in the next phase.</p>
           </div>
-          <button className="secondary-button shrink-0" onClick={() => fileInputRef.current?.click()} type="button">
+          <button className="secondary-button shrink-0" disabled onClick={() => fileInputRef.current?.click()} type="button">
             Select
           </button>
         </div>
@@ -657,7 +738,7 @@ function Composer({
           {sendState === 'sending' ? (
             <div className="mb-3">
               <div className="mb-1 flex justify-between text-xs text-slate-400">
-                <span>Uploading to local mock queue</span>
+                <span>Writing to Supabase relay</span>
                 <span>80%</span>
               </div>
               <div className="h-1 overflow-hidden rounded-full bg-white/10">
@@ -665,7 +746,7 @@ function Composer({
               </div>
             </div>
           ) : null}
-          {sendState === 'failed' ? <InlineAlert message="Upload failed. Retry or remove this file." /> : null}
+          {sendState === 'failed' ? <InlineAlert message={backendError || 'Send failed. Retry after refreshing sync.'} /> : null}
           <button className="send-button" disabled={sendDisabled} onClick={onSend} type="button">
             {sendState === 'sending' ? (
               <IconLoader2 aria-hidden className="motion-safe:animate-spin" size={18} />
@@ -678,7 +759,7 @@ function Composer({
           </button>
           {sendDisabled && sendState !== 'sending' && !markdownValidation.message && attachmentErrors.length === 0 ? (
             <p className="mt-2 text-xs text-slate-500">
-              Add Markdown or attachments to send.
+              Add Markdown to send.
             </p>
           ) : null}
         </div>
@@ -726,6 +807,7 @@ function AttachmentList({ attachments, onRemove }: AttachmentListProps) {
 
 interface QueuePanelProps {
   activeItems: QueueItem[];
+  backendError: string;
   now: Date;
   onCopyMarkdown: (markdown: string) => Promise<void>;
   onDeleteMessage: (id: string) => void;
@@ -734,10 +816,12 @@ interface QueuePanelProps {
   onSelect: (id: string) => void;
   queueStatus: QueueStatus;
   selectedItem: QueueItem | null;
+  syncStatus: SyncStatus;
 }
 
 function QueuePanel({
   activeItems,
+  backendError,
   now,
   onCopyMarkdown,
   onDeleteMessage,
@@ -746,6 +830,7 @@ function QueuePanel({
   onSelect,
   queueStatus,
   selectedItem,
+  syncStatus,
 }: QueuePanelProps) {
   return (
     <section className="panel flex min-h-[calc(100dvh-160px)] flex-col overflow-hidden">
@@ -760,12 +845,21 @@ function QueuePanel({
         </button>
       </div>
 
-      <div className="border-b border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-xs text-amber-100">
-        <div className="flex items-center gap-2">
-          <IconCloudOff aria-hidden size={15} />
-          <span>Realtime disconnected. This build uses a local mock queue.</span>
+      {syncStatus !== 'connected' || backendError ? (
+        <div className="border-b border-amber-300/20 bg-amber-300/[0.07] px-3 py-2 text-xs text-amber-100">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <IconCloudOff aria-hidden size={15} />
+              <span className="truncate">
+                {backendError || (syncStatus === 'connecting' ? 'Connecting realtime relay.' : 'Realtime disconnected.')}
+              </span>
+            </div>
+            <button className="secondary-button min-h-7 px-2 py-1 text-xs" onClick={onRefresh} type="button">
+              Refresh
+            </button>
+          </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_1fr]">
         <div className="min-h-0 border-b border-white/10 md:border-b-0 md:border-r">
@@ -1057,31 +1151,6 @@ function InlineAlert({ message }: { message: string }) {
   );
 }
 
-function createSelectedAttachment(file: File): SelectedAttachment {
-  return {
-    id: globalThis.crypto.randomUUID(),
-    file,
-    previewKind: classifyAttachment(file),
-    objectUrl: createObjectUrl(file),
-  };
-}
-
-function createObjectUrl(file: File): string | undefined {
-  if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-    return URL.createObjectURL(file);
-  }
-
-  return undefined;
-}
-
-function buildJoinLink(roomKey: string): string {
-  if (typeof window === 'undefined') {
-    return `?room=${encodeURIComponent(roomKey)}`;
-  }
-
-  return `${window.location.origin}${import.meta.env.BASE_URL}?room=${encodeURIComponent(roomKey)}`;
-}
-
 function getMarkdownExcerpt(item: QueueItem): string {
   const text = item.markdown
     .replace(/```[\s\S]*?```/g, ' code block ')
@@ -1096,8 +1165,20 @@ function getMarkdownExcerpt(item: QueueItem): string {
   return item.attachments.length === 1 ? '1 attachment' : `${item.attachments.length} attachments`;
 }
 
-function delay(ms: number) {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
+function syncStatusLabel(status: SyncStatus): string {
+  if (status === 'connected') {
+    return 'realtime';
+  }
+
+  if (status === 'connecting') {
+    return 'connecting';
+  }
+
+  return 'manual refresh';
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Supabase relay request failed.';
 }
 
 export default App;

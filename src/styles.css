@@ -120,6 +120,11 @@ a:focus-visible {
     background: rgba(190, 252, 60, 0.08);
   }
 
+  .dropzone-disabled {
+    border-style: solid;
+    opacity: 0.78;
+  }
+
   .attachment-row,
   .file-row,
   .image-attachment {
@@ -203,6 +208,13 @@ a:focus-visible {
   .setup-action:hover {
     border-color: rgba(190, 252, 60, 0.35);
     background: rgba(190, 252, 60, 0.08);
+  }
+
+  .secondary-button:disabled,
+  .icon-button:disabled,
+  .setup-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
   }
 
   .secondary-button:active,

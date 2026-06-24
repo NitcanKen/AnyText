@@ -127,3 +127,36 @@ Intentional deviations or placeholders:
 - The queue shows a `Realtime disconnected` warning because this goal intentionally does not connect Supabase Realtime.
 - Upload progress is a local mock send-state rail; real per-file upload progress belongs to the Supabase attachment phase.
 - Production build currently emits a non-failing Vite/Rolldown warning about the large Tabler icon barrel module. It does not block the static build, but can be optimized later with import rewriting if build time becomes material.
+
+## Implementation Note: Supabase Metadata Text Relay
+
+Implemented on 2026-06-24:
+
+- Added Supabase migrations for `rooms`, `messages`, and `attachments` metadata, including indexes for active room queue reads, expiry scans, and attachment foreign-key access.
+- Added a private `anytext-attachments` storage bucket placeholder with a 25MB file-size limit. Attachment upload/download remains intentionally out of scope for this text relay goal.
+- Chose restricted Postgres RPC as the backend boundary for this phase instead of Edge Functions. The browser calls only `anytext_create_room`, `anytext_list_messages`, `anytext_create_message`, and `anytext_delete_message`; raw room keys are never sent to or stored in the database, and `room_id` is `sha256(roomKey)`.
+- Enabled and forced RLS on `rooms`, `messages`, and `attachments`, revoked direct anon/authenticated table access, and granted anon/authenticated execute only on the restricted RPC functions.
+- Added Supabase Realtime through database-triggered private broadcasts on `anytext:room:{room_id}`. Realtime authorization uses `realtime.topic()` and allows anon/authenticated clients to receive only AnyText room broadcast topics.
+- Implemented frontend room persistence and pairing helpers for first-run create, join by URL/manual code, localStorage room key persistence, device rename, reset browser, copy join link, and QR rendering.
+- Replaced the local mock send/list/delete path with Supabase text-only RPC calls. The app loads active queue items first, subscribes to realtime broadcasts, merges insert/update/delete events, shows disconnected warnings, and supports manual refresh.
+- Kept Goal 1 Markdown rendering and safety behavior: GFM, tables, blockquotes, inline code, syntax highlighted code blocks, per-code-block copy, raw Markdown copy, and HTML/script sanitization.
+- Disabled attachment selection in the UI for this phase to avoid implying partially working upload/download behavior.
+
+Local environment setup:
+
+- Keep real values only in ignored `.env.local` or deployment environment variables.
+- Required frontend variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- `SUPABASE_PROJECT_REF`, `SUPABASE_ACCESS_TOKEN`, and `SUPABASE_SERVICE_ROLE_KEY` stay local/CLI-only and must not be committed.
+- Migrations are applied with `supabase db push --linked` after the CLI is logged in and linked to project `cizmpumlliowigimhwqr`.
+
+Verification completed:
+
+- `supabase db push --linked --dry-run` showed only the AnyText migration pending before deployment.
+- `supabase db push --linked --yes` applied both backend migrations successfully.
+- An anon-key RPC smoke test created a room, created a Markdown message, listed it, soft-deleted it, and confirmed the post-delete list was empty.
+- The same anon-key smoke test confirmed direct broad `messages` table select is blocked with Postgres error code `42501`.
+- A two-client Supabase Realtime smoke test confirmed one client receives INSERT and soft-delete UPDATE broadcasts caused by another client's RPC calls.
+
+Current blocker:
+
+- In-app Browser verification could not be completed because the Browser runtime rejected `http://localhost:5173/AnyText/` under its URL policy. The requested desktop/mobile/two-browser-profile UI verification is therefore still unproven even though CLI tests, build, Supabase RPC, RLS, and realtime smoke checks pass.

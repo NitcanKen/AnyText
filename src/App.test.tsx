@@ -5,18 +5,53 @@ import App from './App';
 import { MARKDOWN_LIMIT_BYTES } from './lib/anytext';
 
 const copyTextMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const supabaseClientMock = vi.hoisted(() => ({}));
+const relayMocks = vi.hoisted(() => ({
+  applyMessageRealtimeEvent: vi.fn((items) => items),
+  createMessage: vi.fn(),
+  createRoom: vi.fn(),
+  deleteMessage: vi.fn(),
+  listMessages: vi.fn(),
+  subscribeToRoomMessages: vi.fn(),
+}));
 
 vi.mock('./lib/clipboard', () => ({
   copyText: copyTextMock,
 }));
 
+vi.mock('./lib/supabaseClient', () => ({
+  getSupabaseClient: () => supabaseClientMock,
+  isSupabaseConfigured: () => true,
+}));
+
+vi.mock('./lib/supabaseRelay', () => relayMocks);
+
 beforeEach(() => {
   localStorage.clear();
   copyTextMock.mockClear();
+  vi.clearAllMocks();
+  relayMocks.createRoom.mockResolvedValue({
+    roomId: 'test-room-hash',
+    expiresPolicyMinutes: 60,
+  });
+  relayMocks.listMessages.mockResolvedValue([]);
+  relayMocks.createMessage.mockImplementation(async (_client, _roomKey, markdown: string, deviceName: string) => ({
+    id: 'message-1',
+    markdown,
+    attachments: [],
+    senderDeviceName: deviceName,
+    createdAt: '2099-06-24T12:00:00.000Z',
+    expiresAt: '2099-06-24T13:00:00.000Z',
+  }));
+  relayMocks.deleteMessage.mockResolvedValue(undefined);
+  relayMocks.subscribeToRoomMessages.mockImplementation(async (_client, _roomKey, { onStatusChange }) => {
+    onStatusChange('connected');
+    return { unsubscribe: vi.fn() };
+  });
 });
 
 describe('AnyText Command Deck app', () => {
-  it('starts with first-run pairing and can create a local device circle', async () => {
+  it('starts with first-run pairing and creates a Supabase-backed device circle', async () => {
     const user = userEvent.setup();
 
     render(<App />);
@@ -28,6 +63,9 @@ describe('AnyText Command Deck app', () => {
     expect(await screen.findByText(/manual pairing code/i)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /markdown input/i })).toBeInTheDocument();
     expect(localStorage.getItem('anytext.roomKey')).toBeTruthy();
+    await waitFor(() => expect(relayMocks.createRoom).toHaveBeenCalled());
+    expect(relayMocks.listMessages).toHaveBeenCalled();
+    expect(relayMocks.subscribeToRoomMessages).toHaveBeenCalled();
   });
 
   it('validates Markdown size before sending', async () => {
@@ -43,7 +81,7 @@ describe('AnyText Command Deck app', () => {
     expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled();
   });
 
-  it('adds a local queue item, expands it, copies markdown/code, and deletes it', async () => {
+  it('sends a text message through Supabase, copies markdown/code, and deletes through Supabase', async () => {
     const user = userEvent.setup();
     localStorage.setItem('anytext.roomKey', 'test-room-key');
 
@@ -68,17 +106,18 @@ describe('AnyText Command Deck app', () => {
     ].join('\n');
 
     await user.type(screen.getByRole('textbox', { name: /markdown input/i }), markdown);
-    await user.upload(screen.getByLabelText(/select attachments/i), [
-      new File([new Uint8Array(12)], 'screen.png', { type: 'image/png' }),
-      new File([new Uint8Array(12)], 'brief.pdf', { type: 'application/pdf' }),
-    ]);
     await user.click(screen.getByRole('button', { name: /^send$/i }));
 
     const item = await screen.findByRole('button', { name: /ship this/i });
     expect(item).toBeInTheDocument();
-    expect(screen.getByText('screen.png')).toBeInTheDocument();
-    expect(screen.getByText('brief.pdf')).toBeInTheDocument();
     expect(screen.queryByText(/alert/)).not.toBeInTheDocument();
+    expect(relayMocks.createMessage).toHaveBeenCalledWith(
+      supabaseClientMock,
+      'test-room-key',
+      markdown,
+      'MacBook',
+      { attachments: [] },
+    );
 
     await user.click(screen.getByRole('button', { name: /copy markdown/i }));
     await waitFor(() => expect(copyTextMock).toHaveBeenLastCalledWith(markdown));
@@ -89,6 +128,7 @@ describe('AnyText Command Deck app', () => {
 
     await user.click(screen.getByRole('button', { name: /delete message/i }));
 
+    expect(relayMocks.deleteMessage).toHaveBeenCalledWith(supabaseClientMock, 'test-room-key', 'message-1');
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /ship this/i })).not.toBeInTheDocument();
     });
