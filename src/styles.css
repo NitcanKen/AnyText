@@ -126,9 +126,7 @@ a:focus-visible {
     opacity: 0.78;
   }
 
-  .attachment-row,
-  .file-row,
-  .image-attachment {
+  .attachment-row {
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -139,23 +137,88 @@ a:focus-visible {
     padding: 0.625rem;
   }
 
-  .image-attachment {
-    color: #e2e8f0;
-    text-align: left;
+  .attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+
+  .attachment-card {
+    display: grid;
+    grid-template-columns: 5rem minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem;
+    min-height: 5.5rem;
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+    padding: 0.625rem;
     transition:
       border-color 140ms ease,
       background-color 140ms ease,
       transform 140ms ease;
   }
 
-  .image-attachment:hover {
+  .attachment-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 5rem;
+    height: 4rem;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.25);
+    color: #cbd5e1;
+  }
+
+  .attachment-copy {
+    min-width: 0;
+    text-align: left;
+  }
+
+  .image-attachment {
+    color: #e2e8f0;
+    text-align: left;
+  }
+
+  .attachment-card:hover,
+  .attachment-card:focus-visible {
     border-color: rgba(190, 252, 60, 0.35);
     background: rgba(190, 252, 60, 0.06);
+  }
+
+  .attachment-card:hover {
+    transform: translateY(-1px);
   }
 
   .image-attachment:disabled {
     cursor: not-allowed;
     opacity: 0.58;
+  }
+
+  .file-row .secondary-button {
+    justify-self: end;
+    white-space: nowrap;
+  }
+
+  @media (max-width: 640px) {
+    .attachment-card {
+      grid-template-columns: 4.25rem minmax(0, 1fr);
+    }
+
+    .attachment-preview {
+      width: 4.25rem;
+      height: 3.5rem;
+    }
+
+    .file-row .secondary-button {
+      grid-column: 1 / -1;
+      justify-self: stretch;
+      justify-content: center;
+    }
   }
 
   .send-button {

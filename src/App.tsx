@@ -427,16 +427,17 @@ function App() {
           </button>
         </div>
 
+        {showPairing ? (
+          <PairingCard
+            joinLink={joinLink}
+            manualCode={roomKey}
+            onClose={() => setShowPairing(false)}
+            onCopyJoinLink={() => copyMarkdown(joinLink)}
+          />
+        ) : null}
+
         <div className="grid min-h-[calc(100dvh-116px)] grid-cols-1 gap-3 md:grid-cols-[minmax(360px,0.42fr)_minmax(0,0.58fr)] md:gap-4">
           <section className={cx('space-y-3 md:block', activeTab === 'send' ? 'block' : 'hidden md:block')}>
-            {showPairing ? (
-              <PairingCard
-                joinLink={joinLink}
-                manualCode={roomKey}
-                onClose={() => setShowPairing(false)}
-                onCopyJoinLink={() => copyMarkdown(joinLink)}
-              />
-            ) : null}
             <Composer
               attachmentErrors={attachmentErrors}
               attachments={attachments}
@@ -1281,7 +1282,7 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
       {item.attachments.length > 0 ? (
         <div className="mt-5 space-y-3">
           <h4 className="text-sm font-semibold">Attachments</h4>
-          <div className="grid gap-3 2xl:grid-cols-2">
+          <div className="attachment-grid">
             {item.attachments.map((attachment) =>
               attachment.previewKind === 'image' ? (
                 <ImageAttachment disabled={isExpired} key={attachment.id} attachment={attachment} onPreview={onImagePreview} />
@@ -1310,13 +1311,13 @@ function ImageAttachment({
 
   return (
     <button
-      className="image-attachment"
+      className="attachment-card image-attachment"
       disabled={disabled}
       onClick={() => onPreview(attachment)}
       title={disabled ? 'Preview expired' : 'Open image preview'}
       type="button"
     >
-      <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-black/25">
+      <div className="attachment-preview">
         {canShowPreview ? (
           <img
             alt=""
@@ -1328,7 +1329,7 @@ function ImageAttachment({
           <IconPhoto aria-hidden size={22} />
         )}
       </div>
-      <div className="min-w-0 text-left">
+      <div className="attachment-copy">
         <p className="truncate text-sm font-medium">{attachment.fileName}</p>
         <p className="font-mono text-[11px] text-slate-500">
           {formatBytes(attachment.fileSize)} · {previewFailed ? 'preview unavailable' : 'image preview'}
@@ -1340,11 +1341,11 @@ function ImageAttachment({
 
 function FileDownloadRow({ attachment, disabled }: { attachment: QueueAttachment; disabled: boolean }) {
   return (
-    <div className="file-row">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded border border-white/10 bg-black/25">
+    <div className="attachment-card file-row">
+      <div className="attachment-preview">
         <IconFile aria-hidden size={18} />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="attachment-copy">
         <p className="truncate text-sm font-medium">{attachment.fileName}</p>
         <p className="font-mono text-[11px] text-slate-500">
           {formatBytes(attachment.fileSize)} · {attachment.mimeType || attachment.fileType}
