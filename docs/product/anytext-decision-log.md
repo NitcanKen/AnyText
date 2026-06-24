@@ -43,10 +43,23 @@ This document records product and design decisions already aligned with the user
 The technical framework is documented in:
 
 - `docs/technical/anytext-technical-framework.md`
+- `docs/technical/anytext-supabase-project.md`
 
 The development sequence is documented in:
 
 - `docs/planning/anytext-development-sequence.md`
+- `docs/planning/anytext-goals.md`
+
+## Confirmed Supabase Project
+
+Verified from the user's logged-in ChatGPT Atlas / Supabase dashboard window on 2026-06-24:
+
+- Supabase organization: `NitcanKen's Org`
+- Supabase project name: `AnyText`
+- Supabase project ref: `cizmpumlliowigimhwqr`
+- Expected project URL: `https://cizmpumlliowigimhwqr.supabase.co`
+
+Keep real anon/publishable keys, access tokens, and service role keys out of committed files. Use local or deployment environment variables.
 
 ## Confirmed UI Direction
 
