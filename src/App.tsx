@@ -1305,6 +1305,9 @@ function ImageAttachment({
   disabled: boolean;
   onPreview: (attachment: QueueAttachment) => void;
 }) {
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const canShowPreview = Boolean(attachment.objectUrl) && !previewFailed;
+
   return (
     <button
       className="image-attachment"
@@ -1314,8 +1317,13 @@ function ImageAttachment({
       type="button"
     >
       <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded border border-white/10 bg-black/25">
-        {attachment.objectUrl ? (
-          <img alt="" className="h-full w-full object-cover" src={attachment.objectUrl} />
+        {canShowPreview ? (
+          <img
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setPreviewFailed(true)}
+            src={attachment.objectUrl}
+          />
         ) : (
           <IconPhoto aria-hidden size={22} />
         )}
@@ -1323,7 +1331,7 @@ function ImageAttachment({
       <div className="min-w-0 text-left">
         <p className="truncate text-sm font-medium">{attachment.fileName}</p>
         <p className="font-mono text-[11px] text-slate-500">
-          {formatBytes(attachment.fileSize)} · image preview
+          {formatBytes(attachment.fileSize)} · {previewFailed ? 'preview unavailable' : 'image preview'}
         </p>
       </div>
     </button>
@@ -1358,6 +1366,9 @@ function FileDownloadRow({ attachment, disabled }: { attachment: QueueAttachment
 }
 
 function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachment; onClose: () => void }) {
+  const [previewFailed, setPreviewFailed] = useState(false);
+  const canShowPreview = Boolean(attachment.objectUrl) && !previewFailed;
+
   return (
     <div className="modal-backdrop" onClick={onClose} role="presentation">
       <div aria-label="Image preview" aria-modal="true" className="modal-panel" onClick={(event) => event.stopPropagation()} role="dialog">
@@ -1371,10 +1382,22 @@ function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachmen
           </button>
         </div>
         <div className="flex max-h-[72dvh] items-center justify-center rounded border border-white/10 bg-black/30">
-          {attachment.objectUrl ? (
-            <img alt={attachment.fileName} className="max-h-[72dvh] max-w-full object-contain" src={attachment.objectUrl} />
+          {canShowPreview ? (
+            <img
+              alt={attachment.fileName}
+              className="max-h-[72dvh] max-w-full object-contain"
+              onError={() => setPreviewFailed(true)}
+              src={attachment.objectUrl}
+            />
           ) : (
-            <div className="p-10 text-sm text-slate-500">Preview URL is not available in this test environment.</div>
+            <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-10 text-center text-sm text-slate-500">
+              <IconPhoto aria-hidden size={28} />
+              <span>
+                {attachment.objectUrl
+                  ? 'Preview is not available in this browser. Download the file to view it.'
+                  : 'Preview URL is not available in this test environment.'}
+              </span>
+            </div>
           )}
         </div>
         {attachment.objectUrl ? (

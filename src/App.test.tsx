@@ -217,6 +217,15 @@ describe('AnyText Command Deck app', () => {
       'src',
       'https://storage.example/signed/screen.png',
     );
+
+    fireEvent.error(screen.getByRole('img', { name: 'screen.png' }));
+
+    const imageDialog = screen.getByRole('dialog', { name: /image preview/i });
+    expect(within(imageDialog).getByText('Preview is not available in this browser. Download the file to view it.')).toBeInTheDocument();
+    expect(within(imageDialog).getByRole('link', { name: /download/i })).toHaveAttribute(
+      'href',
+      'https://storage.example/signed/screen.png',
+    );
   });
 
   it('shows inline attachment validation errors for count and size limits', async () => {
