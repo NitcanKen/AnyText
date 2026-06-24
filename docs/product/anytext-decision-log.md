@@ -250,6 +250,23 @@ Verification completed so far:
 - Cleanup was invoked again after browser tests to remove smoke messages and Storage objects left by failed intermediate CDP attempts.
 - Final `npm run lint && npm test && npm run build` passed after all tracked docs/config/code edits; Vitest covered 5 files and 31 tests.
 
-Remaining verification before declaring the full MVP goal complete:
+Production verification completed:
 
-- Push to `main` and verify GitHub Pages deployment or report the exact external permission/settings blocker.
+- The repository was made public by the owner so GitHub Pages could be enabled for the current plan.
+- GitHub Pages workflow run `28117694163` first proved Pages enablement and deployment from commit `641b153`.
+- Production smoke then found a UI formatter issue: a fresh one-hour item could show `2h left` when the remaining time rounded up just past 60 minutes. Commit `82ca942` changed hour display to floor whole hours and added a 61-minute formatter test.
+- GitHub Pages workflow run `28118310283` deployed commit `82ca942` successfully to `https://nitcanken.github.io/AnyText/`.
+- Fresh production verification after that deploy covered:
+  - live Pages HTML title/base path and live bundle containing the fixed formatter;
+  - fresh room creation in an isolated browser profile;
+  - second isolated browser joining by room link;
+  - room persistence after receiver refresh;
+  - Markdown rendering with GFM table, blockquote, inline code, highlighted bash/typescript code blocks, and sanitized script content;
+  - `1h left` display with no `2h left` on a fresh item;
+  - generated image and PDF attachments through drag/drop, queue attachment count `2`, image preview modal with signed Storage URL HTTP 200, and PDF signed download URL HTTP 200;
+  - receiver delete syncing back to sender;
+  - 390px mobile Queue tab with no horizontal overflow;
+  - `prefers-reduced-motion: reduce` emulation with transition duration reduced to `1e-06s`;
+  - in-app Browser clipboard verification for exact raw Markdown copy and exact bash code block copy.
+- Headless Chrome clipboard readback rejected due browser permission/user-activation constraints, so clipboard assertions were verified through the in-app Browser clipboard API. The application code for copy behavior was unchanged by the final time formatter fix.
+- Final local gate before this production deploy passed: `npm run lint && npm test && npm run build` with Vitest covering 5 files and 31 tests. The remaining build output is the known non-failing Tabler barrel/chunk-size warning.

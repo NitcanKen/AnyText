@@ -2,7 +2,7 @@
 
 AnyText is a static Vite + React Command Deck for sending one-hour Markdown and attachments between browsers through Supabase.
 
-Configured production URL after the GitHub Pages workflow succeeds:
+Production URL:
 
 https://nitcanken.github.io/AnyText/
 
@@ -102,3 +102,11 @@ The build base path is `/AnyText/` by default and can be overridden with `VITE_B
 - Items show one-hour countdown, disappear from queue after expiry, and show an expired detail state if already open.
 - Scheduled cleanup removes expired or deleted Storage objects and records.
 - Desktop and mobile Command Deck layouts are usable with visible focus and reduced-motion support.
+
+## Latest Production Verification
+
+Verified on 2026-06-25 against `https://nitcanken.github.io/AnyText/` after GitHub Pages run `28118310283` deployed commit `82ca942`.
+
+- GitHub Pages returned the AnyText Vite app with the `/AnyText/` base path.
+- Production E2E covered fresh room creation, second isolated browser joining by link, refresh persistence, Markdown render/sanitization, image/PDF attachments, image preview modal, signed document download, receiver delete syncing back to sender, 390px mobile Queue tab layout, and reduced-motion media emulation.
+- In-app Browser clipboard verification confirmed exact raw Markdown copy and exact bash code block copy.
