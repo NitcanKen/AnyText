@@ -108,3 +108,22 @@ These should be aligned before implementation planning:
 - Exact Markdown renderer and syntax highlighting libraries.
 - Whether to preserve generated concept images inside the repo as references.
 - Initial deployment flow for GitHub Pages and Supabase environments.
+
+## Implementation Note: Command Deck Frontend Foundation
+
+Completed on 2026-06-24:
+
+- Created the Vite + React + TypeScript + Tailwind frontend foundation with `dev`, `build`, `lint`, `test`, and `preview` npm scripts.
+- Configured the frontend for GitHub Pages under `/AnyText/`.
+- Kept Supabase as environment placeholders only; no Supabase client, backend, secrets, or real storage integration was added in this goal.
+- Implemented tested local helpers for high-entropy room key generation, `sha256(roomKey)` room ID hashing, Markdown 500KB validation, attachment count and 25MB validation, image/download classification, file-size formatting, one-hour expiry, and active mock queue filtering.
+- Implemented the Command Deck UI direction: first-run create/join surface, pairing placeholder panel, compact top bar and room menu, desktop Compose/Queue two-column layout, mobile Send/Queue tabs, Markdown composer, drag/select attachment handling, inline validation, upload/send states, empty/loading/error/disconnected queue states, local delete, and local expiry hiding.
+- Implemented Markdown preview with GFM tables, blockquotes, inline code, sanitized HTML/script handling, Prism syntax highlighting, raw Markdown copy, per-code-block copy, and stronger shell/command block treatment.
+- Implemented local mock queue behavior for adding, selecting, expanding, deleting, and hiding expired items. Local image previews and file downloads use browser object URLs only.
+
+Intentional deviations or placeholders:
+
+- Pairing QR is a visual placeholder for this frontend-only goal; real QR generation can be added with the full pairing phase.
+- The queue shows a `Realtime disconnected` warning because this goal intentionally does not connect Supabase Realtime.
+- Upload progress is a local mock send-state rail; real per-file upload progress belongs to the Supabase attachment phase.
+- Production build currently emits a non-failing Vite/Rolldown warning about the large Tabler icon barrel module. It does not block the static build, but can be optimized later with import rewriting if build time becomes material.
