@@ -176,6 +176,7 @@ Implemented on 2026-06-24:
 - Completed the MVP content model: one message can include Markdown plus up to 10 attachments, with a 500KB Markdown limit and a 25MB per-file limit enforced in both frontend validation and restricted backend RPC.
 - Added attachment upload metadata fields: `upload_status`, `uploaded_at`, `upload_error`, and `cleanup_pending`.
 - Added safe storage path generation in Postgres using the required shape: `rooms/{roomId}/messages/{messageId}/{attachmentId}-{safeFileName}`. The original filename is preserved only as metadata; storage paths use a sanitized filename segment and a server-generated attachment UUID.
+- Hardened safe filename generation after fresh verification found an unsafe `..` segment could remain inside the sanitized filename. Repeated dot sequences are now removed before upload targets are generated.
 - Replaced text-only `anytext_create_message` with a message-plus-attachment RPC. It creates the message, validates attachment count/size, conservatively classifies common images as `image` and everything else as `download`, registers pending attachment metadata, and returns upload targets.
 - Added `anytext_mark_attachment_uploaded` and `anytext_finalize_message_uploads`. The frontend only shows finalized uploaded attachments in normal list/detail views.
 - Added a private Storage INSERT policy for `anytext-attachments` that allows uploads only to an active pending attachment path already registered by backend metadata. The policy uses a `security definer` helper so anon clients do not receive direct `attachments` table read access.
@@ -201,10 +202,13 @@ Verification completed:
 
 - `npm run lint && npm test && npm run build` passed after the attachment implementation. Vitest covered 5 files and 30 tests.
 - `supabase db push` applied migrations `20260624160000` and `20260624162000` to project `cizmpumlliowigimhwqr`.
+- Fresh verification on 2026-06-25 applied migration `20260625003000` to harden attachment safe filenames.
 - `supabase functions deploy anytext-create-download-url` deployed the Edge Function to the linked project.
 - Real Supabase smoke verified: message creation with image/PDF/zip metadata, signed upload URL creation, Storage upload, mark uploaded, finalize, list with 3 attachments, image and file signed URLs fetch with HTTP 200, too-many and over-25MB backend rejection, delete hiding, post-delete download URL rejection, and `cleanup_pending` on all deleted attachments.
+- Fresh verification on 2026-06-25 re-ran the real Supabase smoke after filename hardening and confirmed unsafe original filenames no longer leave `..` segments in storage object keys.
 - Browser verification used the in-app Browser for desktop/mobile layout, signed attachment rendering, image preview modal, file download links, and two-tab delete sync. The in-app Browser file upload API was not available, so Google Chrome headless through CDP was used for the file-picker-specific checks without adding repo dependencies.
 - Chrome CDP browser verification covered Markdown+image send, Markdown+PDF+zip send, signed download anchors, more-than-10 attachment inline validation, over-25MB inline validation, reduced-motion media emulation, and basic Tab focus entry.
+- Fresh browser verification on 2026-06-25 covered two isolated profiles, Markdown+image/PDF send, image preview modal, PDF/zip signed URL fetches with HTTP 200, more-than-10 and over-25MB inline validation, reduced-motion mobile viewport, delete sync, and clean console output.
 
 Known follow-up:
 
