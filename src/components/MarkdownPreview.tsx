@@ -22,12 +22,14 @@ export function MarkdownPreview({ markdown }: MarkdownPreviewProps) {
               {children}
             </a>
           ),
-          code: ({ children, className, inline, ...props }: CodeProps) => {
+          code: ({ children, className, ...props }: CodeProps) => {
             const match = /language-(\w+)/.exec(className ?? '');
-            const code = String(children).replace(/\n$/, '');
+            const rawCode = String(children);
+            const code = rawCode.replace(/\n$/, '');
+            const isCodeBlock = Boolean(match) || rawCode.endsWith('\n');
 
-            if (!inline && match) {
-              return <CodeBlock code={code} language={match[1]} />;
+            if (isCodeBlock) {
+              return <CodeBlock code={code} language={match?.[1] ?? 'text'} />;
             }
 
             return (
