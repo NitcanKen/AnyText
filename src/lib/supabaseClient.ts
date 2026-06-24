@@ -1,8 +1,8 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { AnyTextRealtimeClient, AnyTextRpcClient } from './supabaseRelay';
+import type { AnyTextFunctionsClient, AnyTextRealtimeClient, AnyTextRpcClient, AnyTextStorageClient } from './supabaseRelay';
 
 let cachedClient: SupabaseClient | null = null;
-type AnyTextSupabaseClient = AnyTextRpcClient & AnyTextRealtimeClient;
+type AnyTextSupabaseClient = AnyTextRpcClient & AnyTextRealtimeClient & AnyTextStorageClient & AnyTextFunctionsClient;
 
 export function isSupabaseConfigured(): boolean {
   return Boolean(

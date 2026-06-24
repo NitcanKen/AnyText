@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ATTACHMENT_LIMITS,
   MARKDOWN_LIMIT_BYTES,
+  createAttachmentInput,
   classifyAttachment,
   createMockQueueItem,
   formatBytes,
@@ -62,6 +63,23 @@ describe('AnyText validation helpers', () => {
     expect(classifyAttachment(makeFile('screen.png', 24, 'image/png'))).toBe('image');
     expect(classifyAttachment(makeFile('notes.pdf', 24, 'application/pdf'))).toBe('download');
     expect(classifyAttachment(makeFile('vector.svg', 24, 'image/svg+xml'))).toBe('download');
+  });
+
+  it('builds conservative attachment metadata for backend registration', () => {
+    expect(createAttachmentInput(makeFile('../screen shot.PNG', 24, 'image/png'), 'client-1')).toEqual({
+      client_id: 'client-1',
+      file_name: '../screen shot.PNG',
+      file_size: 24,
+      file_type: 'PNG',
+      mime_type: 'image/png',
+      preview_kind: 'image',
+    });
+
+    expect(createAttachmentInput(makeFile('archive', 24, ''), 'client-2')).toMatchObject({
+      file_type: 'file',
+      mime_type: 'application/octet-stream',
+      preview_kind: 'download',
+    });
   });
 
   it('formats file sizes for attachment rows', () => {

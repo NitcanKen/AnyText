@@ -1,5 +1,7 @@
-import type { QueueItem } from './anytext';
-import { getActiveQueueItems, hashRoomKey, validateMarkdown } from './anytext';
+import type { AttachmentPreviewKind, QueueAttachment, QueueItem } from './anytext';
+import { createAttachmentInput, getActiveQueueItems, hashRoomKey, validateAttachments, validateMarkdown } from './anytext';
+
+const ATTACHMENT_BUCKET = 'anytext-attachments';
 
 type RpcError = {
   message?: string;
@@ -12,6 +14,47 @@ type RpcResult = {
 
 export type AnyTextRpcClient = {
   rpc: (name: string, args: Record<string, unknown>) => PromiseLike<RpcResult>;
+};
+
+type StorageError = {
+  message?: string;
+};
+
+type SignedUploadResult = {
+  data: { path: string; signedUrl: string; token: string } | null;
+  error: StorageError | null;
+};
+
+type UploadResult = {
+  data: { path: string; fullPath: string } | null;
+  error: StorageError | null;
+};
+
+export type AnyTextStorageClient = AnyTextRpcClient & {
+  storage: {
+    from: (bucket: string) => {
+      createSignedUploadUrl: (path: string, options: { upsert: false }) => PromiseLike<SignedUploadResult>;
+      uploadToSignedUrl: (
+        path: string,
+        token: string,
+        file: File,
+        options: { cacheControl: string; contentType: string; upsert: false },
+      ) => PromiseLike<UploadResult>;
+    };
+  };
+};
+
+type FunctionError = {
+  message?: string;
+};
+
+export type AnyTextFunctionsClient = {
+  functions: {
+    invoke: <T = unknown>(
+      name: string,
+      options: { body: Record<string, unknown> },
+    ) => PromiseLike<{ data: T | null; error: FunctionError | null }>;
+  };
 };
 
 type AnyTextRealtimeChannel = {
@@ -47,6 +90,24 @@ type MessageRow = {
   created_at: string;
   expires_at: string;
   deleted_at: string | null;
+  attachments?: AttachmentRow[];
+};
+
+type AttachmentRow = {
+  id: string;
+  client_id?: string | null;
+  message_id: string;
+  room_id: string;
+  file_name: string;
+  file_type: string;
+  mime_type: string;
+  file_size: number;
+  storage_path?: string;
+  preview_kind: AttachmentPreviewKind;
+  created_at: string;
+  expires_at: string;
+  deleted_at: string | null;
+  upload_status?: string;
 };
 
 type RoomRow = {
@@ -79,32 +140,59 @@ export async function listMessages(client: AnyTextRpcClient, roomKey: string): P
 }
 
 export async function createMessage(
-  client: AnyTextRpcClient,
+  client: AnyTextRpcClient | (AnyTextStorageClient & AnyTextFunctionsClient),
   roomKey: string,
   markdown: string,
   senderDeviceName: string,
-  options: { attachments?: unknown[] } = {},
+  options: {
+    attachments?: Array<{ clientId: string; file: File }>;
+    onAttachmentProgress?: (progress: AttachmentUploadProgress) => void;
+  } = {},
 ): Promise<QueueItem> {
-  if (options.attachments?.length) {
-    throw new Error('Attachments are not enabled for the text-only Supabase relay.');
-  }
-
+  const attachments = options.attachments ?? [];
   const validation = validateMarkdown(markdown);
 
   if (!validation.valid) {
     throw new Error(validation.message);
   }
 
-  if (!markdown.trim()) {
-    throw new Error('Markdown is required for the text-only relay.');
+  const attachmentErrors = validateAttachments(attachments.map((attachment) => attachment.file));
+
+  if (attachmentErrors.length > 0) {
+    throw new Error(attachmentErrors[0]);
+  }
+
+  if (!markdown.trim() && attachments.length === 0) {
+    throw new Error('Markdown or attachment is required.');
   }
 
   const roomId = await hashRoomKey(roomKey);
-  const row = await callRpc<MessageRow>(client, 'anytext_create_message', {
+  let row = await callRpc<MessageRow>(client, 'anytext_create_message', {
     p_room_id: roomId,
     p_markdown_text: markdown,
     p_sender_device_name: senderDeviceName,
+    p_attachments: attachments.map((attachment) => createAttachmentInput(attachment.file, attachment.clientId)),
   });
+
+  if (attachments.length > 0) {
+    if (!hasStorageClient(client)) {
+      throw new Error('Supabase Storage client is required for attachments.');
+    }
+
+    try {
+      await uploadAttachments(client, roomId, row, attachments, options.onAttachmentProgress);
+      row = await callRpc<MessageRow>(client, 'anytext_finalize_message_uploads', {
+        p_room_id: roomId,
+        p_message_id: row.id,
+      });
+    } catch (error) {
+      await callRpc<MessageRow>(client, 'anytext_delete_message', {
+        p_room_id: roomId,
+        p_message_id: row.id,
+      }).catch(() => undefined);
+      throw error;
+    }
+  }
 
   return mapMessageRow(row);
 }
@@ -137,6 +225,43 @@ export function applyMessageRealtimeEvent(items: QueueItem[], event: MessageReal
   }
 
   return getActiveQueueItems([mapMessageRow(row), ...withoutCurrent], now);
+}
+
+export type AttachmentUploadProgress = {
+  clientId: string;
+  fileName: string;
+  status: 'queued' | 'signing' | 'uploading' | 'uploaded' | 'failed';
+  progress: number;
+  message?: string;
+};
+
+export async function createAttachmentDownloadUrl(
+  client: AnyTextFunctionsClient,
+  roomKey: string,
+  input: { messageId: string; attachmentId: string; download?: boolean },
+): Promise<{ signedUrl: string; expiresIn: number }> {
+  const roomId = await hashRoomKey(roomKey);
+  const { data, error } = await client.functions.invoke<{ signedUrl: string; expiresIn: number }>(
+    'anytext-create-download-url',
+    {
+      body: {
+        roomId,
+        messageId: input.messageId,
+        attachmentId: input.attachmentId,
+        download: input.download ?? false,
+      },
+    },
+  );
+
+  if (error) {
+    throw new Error(error.message ?? 'Failed to create download URL.');
+  }
+
+  if (!data?.signedUrl) {
+    throw new Error('Download URL function returned no URL.');
+  }
+
+  return data;
 }
 
 export async function subscribeToRoomMessages(
@@ -179,11 +304,23 @@ function mapMessageRow(row: MessageRow): QueueItem {
   return {
     id: row.id,
     markdown: row.markdown_text ?? '',
-    attachments: [],
+    attachments: Array.isArray(row.attachments) ? row.attachments.map(mapAttachmentRow) : [],
     senderDeviceName: row.sender_device_name ?? 'Unknown device',
     createdAt: row.created_at,
     expiresAt: row.expires_at,
     deletedAt: row.deleted_at ?? undefined,
+  };
+}
+
+function mapAttachmentRow(row: AttachmentRow): QueueAttachment {
+  return {
+    id: row.id,
+    messageId: row.message_id,
+    fileName: row.file_name,
+    fileType: row.file_type,
+    mimeType: row.mime_type,
+    fileSize: row.file_size,
+    previewKind: row.preview_kind,
   };
 }
 
@@ -261,4 +398,81 @@ function isMessageRow(value: unknown): value is MessageRow {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+async function uploadAttachments(
+  client: AnyTextStorageClient,
+  roomId: string,
+  row: MessageRow,
+  attachments: Array<{ clientId: string; file: File }>,
+  onAttachmentProgress: ((progress: AttachmentUploadProgress) => void) | undefined,
+) {
+  const targets = Array.isArray(row.attachments) ? row.attachments : [];
+  const storage = client.storage.from(ATTACHMENT_BUCKET);
+
+  for (const attachment of attachments) {
+    const target = targets.find((candidate) => candidate.client_id === attachment.clientId);
+
+    if (!target?.storage_path) {
+      throw new Error(`${attachment.file.name} did not receive an upload target.`);
+    }
+
+    try {
+      onAttachmentProgress?.({
+        clientId: attachment.clientId,
+        fileName: attachment.file.name,
+        progress: 8,
+        status: 'signing',
+      });
+
+      const signed = await storage.createSignedUploadUrl(target.storage_path, { upsert: false });
+
+      if (signed.error || !signed.data?.token) {
+        throw new Error(signed.error?.message ?? `${attachment.file.name} upload URL failed.`);
+      }
+
+      onAttachmentProgress?.({
+        clientId: attachment.clientId,
+        fileName: attachment.file.name,
+        progress: 45,
+        status: 'uploading',
+      });
+
+      const uploaded = await storage.uploadToSignedUrl(target.storage_path, signed.data.token, attachment.file, {
+        cacheControl: '3600',
+        contentType: attachment.file.type || 'application/octet-stream',
+        upsert: false,
+      });
+
+      if (uploaded.error) {
+        throw new Error(uploaded.error.message ?? `${attachment.file.name} upload failed.`);
+      }
+
+      await callRpc<AttachmentRow>(client, 'anytext_mark_attachment_uploaded', {
+        p_room_id: roomId,
+        p_message_id: row.id,
+        p_attachment_id: target.id,
+      });
+
+      onAttachmentProgress?.({
+        clientId: attachment.clientId,
+        fileName: attachment.file.name,
+        progress: 100,
+        status: 'uploaded',
+      });
+    } catch (error) {
+      onAttachmentProgress?.({
+        clientId: attachment.clientId,
+        fileName: attachment.file.name,
+        message: error instanceof Error ? error.message : `${attachment.file.name} upload failed.`,
+        progress: 100,
+        status: 'failed',
+      });
+      throw error;
+    }
+  }
+}
+
+function hasStorageClient(client: AnyTextRpcClient | AnyTextStorageClient): client is AnyTextStorageClient {
+  return 'storage' in client;
 }

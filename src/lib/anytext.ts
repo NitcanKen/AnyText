@@ -9,12 +9,22 @@ export type AttachmentPreviewKind = 'image' | 'download';
 
 export interface QueueAttachment {
   id: string;
+  messageId: string;
   fileName: string;
   fileType: string;
   mimeType: string;
   fileSize: number;
   previewKind: AttachmentPreviewKind;
   objectUrl?: string;
+}
+
+export interface AttachmentInput {
+  client_id: string;
+  file_name: string;
+  file_type: string;
+  mime_type: string;
+  file_size: number;
+  preview_kind: AttachmentPreviewKind;
 }
 
 export interface QueueItem {
@@ -76,6 +86,17 @@ export function classifyAttachment(file: File): AttachmentPreviewKind {
   return previewableImageTypes.has(file.type) ? 'image' : 'download';
 }
 
+export function createAttachmentInput(file: File, clientId: string): AttachmentInput {
+  return {
+    client_id: clientId,
+    file_name: file.name,
+    file_type: getFileTypeLabel(file),
+    mime_type: file.type || 'application/octet-stream',
+    file_size: file.size,
+    preview_kind: classifyAttachment(file),
+  };
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -102,12 +123,14 @@ export function createMockQueueItem(input: {
 }): QueueItem {
   const createdAt = input.now ?? new Date();
   const expiresAt = new Date(createdAt.getTime() + 60 * 60 * 1000);
+  const id = input.id ?? createId();
 
   return {
-    id: input.id ?? createId(),
+    id,
     markdown: input.markdown,
     attachments: (input.files ?? []).map((file) => ({
       id: createId(),
+      messageId: id,
       fileName: file.name,
       fileType: getFileTypeLabel(file),
       mimeType: file.type || 'application/octet-stream',

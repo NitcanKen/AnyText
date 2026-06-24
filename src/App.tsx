@@ -38,11 +38,13 @@ import {
   type AttachmentPreviewKind,
   type QueueAttachment,
   type QueueItem,
+  classifyAttachment,
   formatBytes,
   formatTimeRemaining,
   generateRoomKey,
   getActiveQueueItems,
   getItemTimeState,
+  validateAttachments,
   validateMarkdown,
 } from './lib/anytext';
 import { copyText } from './lib/clipboard';
@@ -58,19 +60,28 @@ import {
 import { getSupabaseClient, isSupabaseConfigured } from './lib/supabaseClient';
 import {
   applyMessageRealtimeEvent,
+  createAttachmentDownloadUrl,
   createMessage as createSupabaseMessage,
   createRoom,
   deleteMessage as deleteSupabaseMessage,
   listMessages,
   subscribeToRoomMessages,
+  type AttachmentUploadProgress,
+  type AnyTextFunctionsClient,
+  type AnyTextRpcClient,
   type RealtimeStatus,
 } from './lib/supabaseRelay';
+
+type QueueLoadClient = AnyTextRpcClient & AnyTextFunctionsClient;
 
 interface SelectedAttachment {
   id: string;
   file: File;
   previewKind: AttachmentPreviewKind;
   objectUrl?: string;
+  progress: number;
+  status: 'ready' | AttachmentUploadProgress['status'];
+  error?: string;
 }
 
 type SendState = 'idle' | 'sending' | 'sent' | 'failed';
@@ -127,7 +138,7 @@ function App() {
       try {
         const client = getSupabaseClient();
         const room = await createRoom(client, roomKey, deviceName);
-        const items = await listMessages(client, roomKey);
+        const items = await loadQueueWithAttachmentUrls(client, roomKey);
 
         if (cancelled) {
           return;
@@ -142,6 +153,20 @@ function App() {
           onEvent: (event) => {
             if (!cancelled) {
               setQueueItems((currentItems) => applyMessageRealtimeEvent(currentItems, event));
+              void loadQueueWithAttachmentUrls(client, roomKey)
+                .then((freshItems) => {
+                  if (!cancelled) {
+                    setQueueItems(freshItems);
+                    setSelectedId((current) =>
+                      current && freshItems.some((item) => item.id === current) ? current : freshItems[0]?.id ?? null,
+                    );
+                  }
+                })
+                .catch((error) => {
+                  if (!cancelled) {
+                    setBackendError(getErrorMessage(error));
+                  }
+                });
             }
           },
           onStatusChange: (status) => {
@@ -185,12 +210,13 @@ function App() {
   const markdownValidation = useMemo(() => validateMarkdown(markdown), [markdown]);
   const activeItems = useMemo(() => getActiveQueueItems(queueItems, now), [queueItems, now]);
   const selectedItem = activeItems.find((item) => item.id === selectedId) ?? activeItems[0] ?? null;
+  const hasDraftContent = markdown.trim().length > 0 || attachments.length > 0;
   const sendDisabled =
     sendState === 'sending' ||
     !isSupabaseConfigured() ||
     !markdownValidation.valid ||
     attachmentErrors.length > 0 ||
-    markdown.trim().length === 0;
+    !hasDraftContent;
   const joinLink = roomKey ? buildJoinLink(roomKey) : '';
 
   if (!roomKey) {
@@ -222,14 +248,30 @@ function App() {
       return;
     }
 
-    setAttachments([]);
-    setAttachmentErrors(['Attachments are paused for this text-only Supabase relay build.']);
+    const nextAttachments = [
+      ...attachments,
+      ...files.map((file) => ({
+        id: createLocalId(),
+        file,
+        previewKind: classifyAttachment(file),
+        objectUrl: classifyAttachment(file) === 'image' ? URL.createObjectURL(file) : undefined,
+        progress: 0,
+        status: 'ready' as const,
+      })),
+    ];
+
+    setAttachments(nextAttachments);
+    setAttachmentErrors(validateAttachments(nextAttachments.map((attachment) => attachment.file)));
   }
 
   function removeAttachment(id: string) {
+    const removed = attachments.find((attachment) => attachment.id === id);
     const nextAttachments = attachments.filter((attachment) => attachment.id !== id);
+    if (removed?.objectUrl) {
+      URL.revokeObjectURL(removed.objectUrl);
+    }
     setAttachments(nextAttachments);
-    setAttachmentErrors([]);
+    setAttachmentErrors(validateAttachments(nextAttachments.map((attachment) => attachment.file)));
   }
 
   async function sendMessage() {
@@ -240,12 +282,29 @@ function App() {
     setSendState('sending');
 
     try {
-      const item = await createSupabaseMessage(getSupabaseClient(), roomKey, markdown, deviceName, {
-        attachments: attachments.map((attachment) => attachment.file),
-      });
-      setQueueItems((items) => getActiveQueueItems([item, ...items]));
-      setSelectedId(item.id);
+      const client = getSupabaseClient();
+      const item = await createSupabaseMessage(
+        client,
+        roomKey,
+        markdown,
+        deviceName,
+        attachments.length > 0
+          ? {
+              attachments: attachments.map((attachment) => ({ clientId: attachment.id, file: attachment.file })),
+              onAttachmentProgress: updateAttachmentProgress,
+            }
+          : { attachments: [] },
+      );
+      const itemWithUrls = await hydrateQueueItemAttachmentUrls(client, roomKey, item);
+
+      setQueueItems((items) => getActiveQueueItems([itemWithUrls, ...items]));
+      setSelectedId(itemWithUrls.id);
       setMarkdown('');
+      attachments.forEach((attachment) => {
+        if (attachment.objectUrl) {
+          URL.revokeObjectURL(attachment.objectUrl);
+        }
+      });
       setAttachments([]);
       setAttachmentErrors([]);
       setSendState('sent');
@@ -283,7 +342,7 @@ function App() {
     setQueueStatus('loading');
 
     try {
-      const items = await listMessages(getSupabaseClient(), roomKey);
+      const items = await loadQueueWithAttachmentUrls(getSupabaseClient(), roomKey);
       setQueueItems(items);
       setSelectedId((current) => (current && items.some((item) => item.id === current) ? current : items[0]?.id ?? null));
       setQueueStatus('idle');
@@ -292,6 +351,21 @@ function App() {
       setQueueStatus('error');
       setBackendError(getErrorMessage(error));
     }
+  }
+
+  function updateAttachmentProgress(progress: AttachmentUploadProgress) {
+    setAttachments((current) =>
+      current.map((attachment) =>
+        attachment.id === progress.clientId
+          ? {
+              ...attachment,
+              error: progress.message,
+              progress: progress.progress,
+              status: progress.status,
+            }
+          : attachment,
+      ),
+    );
   }
 
   function resetBrowser() {
@@ -696,7 +770,7 @@ function Composer({
         {markdownValidation.message ? <InlineAlert message={markdownValidation.message} /> : null}
 
         <div
-          className={cx('dropzone dropzone-disabled', dragging && 'dropzone-active')}
+          className={cx('dropzone', dragging && 'dropzone-active')}
           onDragLeave={() => setDragging(false)}
           onDragOver={(event) => {
             event.preventDefault();
@@ -707,7 +781,6 @@ function Composer({
           <input
             aria-label="Select attachments"
             className="sr-only"
-            disabled
             multiple
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               onAddFiles(Array.from(event.target.files ?? []));
@@ -719,11 +792,11 @@ function Composer({
           <IconUpload aria-hidden className="text-lime-200" size={18} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium text-slate-100">
-              {dragging ? 'Attachments are paused' : 'Attachments paused for this phase'}
+              {dragging ? 'Drop attachments to add' : 'Attach images or files'}
             </p>
-            <p className="text-xs text-slate-500">Supabase text relay is active. File upload/download lands in the next phase.</p>
+            <p className="text-xs text-slate-500">Up to 10 files, 25MB each. Images preview; documents download.</p>
           </div>
-          <button className="secondary-button shrink-0" disabled onClick={() => fileInputRef.current?.click()} type="button">
+          <button className="secondary-button shrink-0" onClick={() => fileInputRef.current?.click()} type="button">
             Select
           </button>
         </div>
@@ -759,7 +832,7 @@ function Composer({
           </button>
           {sendDisabled && sendState !== 'sending' && !markdownValidation.message && attachmentErrors.length === 0 ? (
             <p className="mt-2 text-xs text-slate-500">
-              Add Markdown to send.
+              Add Markdown or attachments to send.
             </p>
           ) : null}
         </div>
@@ -788,8 +861,18 @@ function AttachmentList({ attachments, onRemove }: AttachmentListProps) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-slate-100">{attachment.file.name}</p>
             <p className="font-mono text-[11px] text-slate-500">
-              {formatBytes(attachment.file.size)} · {attachment.file.type || 'file'}
+              {formatBytes(attachment.file.size)} · {attachment.file.type || 'file'} · {attachmentStatusLabel(attachment)}
             </p>
+            <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
+              <div
+                className={cx(
+                  'h-full rounded-full transition-[width] duration-150',
+                  attachment.status === 'failed' ? 'bg-red-300' : 'bg-lime-300',
+                )}
+                style={{ width: `${attachmentProgressValue(attachment)}%` }}
+              />
+            </div>
+            {attachment.error ? <p className="mt-1 text-xs text-red-200">{attachment.error}</p> : null}
           </div>
           <button
             aria-label={`Remove ${attachment.file.name}`}
@@ -1043,7 +1126,7 @@ function MessageDetail({ item, now, onCopyMarkdown, onDeleteMessage, onImagePrev
       {item.attachments.length > 0 ? (
         <div className="mt-5 space-y-3">
           <h4 className="text-sm font-semibold">Attachments</h4>
-          <div className="grid gap-3 lg:grid-cols-2">
+          <div className="grid gap-3 2xl:grid-cols-2">
             {item.attachments.map((attachment) =>
               attachment.previewKind === 'image' ? (
                 <ImageAttachment key={attachment.id} attachment={attachment} onPreview={onImagePreview} />
@@ -1151,6 +1234,76 @@ function InlineAlert({ message }: { message: string }) {
   );
 }
 
+async function loadQueueWithAttachmentUrls(client: QueueLoadClient, roomKey: string): Promise<QueueItem[]> {
+  const items = await listMessages(client, roomKey);
+
+  return Promise.all(items.map((item) => hydrateQueueItemAttachmentUrls(client, roomKey, item)));
+}
+
+async function hydrateQueueItemAttachmentUrls(
+  client: AnyTextFunctionsClient,
+  roomKey: string,
+  item: QueueItem,
+): Promise<QueueItem> {
+  if (item.attachments.length === 0) {
+    return item;
+  }
+
+  const attachments = await Promise.all(
+    item.attachments.map(async (attachment) => {
+      if (attachment.objectUrl) {
+        return attachment;
+      }
+
+      try {
+        const { signedUrl } = await createAttachmentDownloadUrl(client, roomKey, {
+          attachmentId: attachment.id,
+          download: attachment.previewKind === 'download',
+          messageId: attachment.messageId,
+        });
+
+        return { ...attachment, objectUrl: signedUrl };
+      } catch {
+        return attachment;
+      }
+    }),
+  );
+
+  return { ...item, attachments };
+}
+
+function attachmentStatusLabel(attachment: SelectedAttachment): string {
+  if (attachment.status === 'ready') {
+    return 'ready';
+  }
+
+  if (attachment.status === 'signing') {
+    return 'preparing upload';
+  }
+
+  if (attachment.status === 'uploading') {
+    return 'uploading';
+  }
+
+  if (attachment.status === 'uploaded') {
+    return 'uploaded';
+  }
+
+  if (attachment.status === 'failed') {
+    return 'failed';
+  }
+
+  return 'queued';
+}
+
+function attachmentProgressValue(attachment: SelectedAttachment): number {
+  if (attachment.status === 'ready') {
+    return 6;
+  }
+
+  return attachment.progress;
+}
+
 function getMarkdownExcerpt(item: QueueItem): string {
   const text = item.markdown
     .replace(/```[\s\S]*?```/g, ' code block ')
@@ -1179,6 +1332,10 @@ function syncStatusLabel(status: SyncStatus): string {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Supabase relay request failed.';
+}
+
+function createLocalId(): string {
+  return globalThis.crypto.randomUUID?.() ?? `attachment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export default App;

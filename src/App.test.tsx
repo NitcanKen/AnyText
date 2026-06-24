@@ -8,6 +8,7 @@ const copyTextMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const supabaseClientMock = vi.hoisted(() => ({}));
 const relayMocks = vi.hoisted(() => ({
   applyMessageRealtimeEvent: vi.fn((items) => items),
+  createAttachmentDownloadUrl: vi.fn(),
   createMessage: vi.fn(),
   createRoom: vi.fn(),
   deleteMessage: vi.fn(),
@@ -44,6 +45,10 @@ beforeEach(() => {
     expiresAt: '2099-06-24T13:00:00.000Z',
   }));
   relayMocks.deleteMessage.mockResolvedValue(undefined);
+  relayMocks.createAttachmentDownloadUrl.mockResolvedValue({
+    expiresIn: 60,
+    signedUrl: 'https://storage.example/signed/file',
+  });
   relayMocks.subscribeToRoomMessages.mockImplementation(async (_client, _roomKey, { onStatusChange }) => {
     onStatusChange('connected');
     return { unsubscribe: vi.fn() };
@@ -133,5 +138,105 @@ describe('AnyText Command Deck app', () => {
       expect(screen.queryByRole('button', { name: /ship this/i })).not.toBeInTheDocument();
     });
     expect(screen.getByText('No items in the last hour.')).toBeInTheDocument();
+  });
+
+  it('selects multiple attachments, sends them with Markdown, previews images, and downloads files', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('anytext.roomKey', 'test-room-key');
+    relayMocks.createMessage.mockResolvedValueOnce({
+      id: 'message-with-files',
+      markdown: '# Attachments',
+      attachments: [
+        {
+          id: 'image-1',
+          messageId: 'message-with-files',
+          fileName: 'screen.png',
+          fileType: 'PNG',
+          mimeType: 'image/png',
+          fileSize: 3,
+          previewKind: 'image',
+          objectUrl: 'https://storage.example/signed/screen.png',
+        },
+        {
+          id: 'file-1',
+          messageId: 'message-with-files',
+          fileName: 'brief.pdf',
+          fileType: 'PDF',
+          mimeType: 'application/pdf',
+          fileSize: 4,
+          previewKind: 'download',
+          objectUrl: 'https://storage.example/signed/brief.pdf',
+        },
+      ],
+      senderDeviceName: 'MacBook',
+      createdAt: '2099-06-24T12:00:00.000Z',
+      expiresAt: '2099-06-24T13:00:00.000Z',
+    });
+
+    render(<App />);
+
+    const image = new File([new Uint8Array([1, 2, 3])], 'screen.png', { type: 'image/png' });
+    const pdf = new File([new Uint8Array([1, 2, 3, 4])], 'brief.pdf', { type: 'application/pdf' });
+
+    await user.type(screen.getByRole('textbox', { name: /markdown input/i }), '# Attachments');
+    await user.upload(screen.getByLabelText(/select attachments/i), [image, pdf]);
+
+    expect(screen.getByText('screen.png')).toBeInTheDocument();
+    expect(screen.getByText('brief.pdf')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await screen.findByRole('button', { name: /attachments/i });
+    expect(relayMocks.createMessage).toHaveBeenCalledWith(
+      supabaseClientMock,
+      'test-room-key',
+      '# Attachments',
+      'MacBook',
+      expect.objectContaining({
+        attachments: [
+          expect.objectContaining({ clientId: expect.any(String), file: image }),
+          expect.objectContaining({ clientId: expect.any(String), file: pdf }),
+        ],
+      }),
+    );
+    expect(screen.getByRole('button', { name: /screen\.png/i })).toBeInTheDocument();
+    expect(screen.getByText('brief.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /download/i })).toHaveAttribute(
+      'href',
+      'https://storage.example/signed/brief.pdf',
+    );
+
+    await user.click(screen.getByRole('button', { name: /screen\.png/i }));
+
+    expect(await screen.findByRole('img', { name: 'screen.png' })).toHaveAttribute(
+      'src',
+      'https://storage.example/signed/screen.png',
+    );
+  });
+
+  it('shows inline attachment validation errors for count and size limits', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('anytext.roomKey', 'test-room-key');
+
+    render(<App />);
+
+    const tooMany = Array.from(
+      { length: 11 },
+      (_, index) => new File([new Uint8Array([1])], `file-${index}.txt`, { type: 'text/plain' }),
+    );
+
+    await user.upload(screen.getByLabelText(/select attachments/i), tooMany);
+
+    expect(screen.getByText('Maximum 10 attachments.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled();
+
+    await user.click(screen.getByLabelText('Remove file-0.txt'));
+
+    const large = new File([new Uint8Array(25 * 1024 * 1024 + 1)], 'large.zip', { type: 'application/zip' });
+
+    await user.upload(screen.getByLabelText(/select attachments/i), [large]);
+
+    expect(screen.getByText('large.zip is over 25MB.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled();
   });
 });

@@ -168,3 +168,45 @@ Additional verification completed after merge to `main`:
 Current blocker:
 
 - None for Goal 2. Attachment upload/download, signed URLs, and storage cleanup remain intentionally deferred to Goal 3.
+
+## Implementation Note: Supabase Attachment Content Model
+
+Implemented on 2026-06-24:
+
+- Completed the MVP content model: one message can include Markdown plus up to 10 attachments, with a 500KB Markdown limit and a 25MB per-file limit enforced in both frontend validation and restricted backend RPC.
+- Added attachment upload metadata fields: `upload_status`, `uploaded_at`, `upload_error`, and `cleanup_pending`.
+- Added safe storage path generation in Postgres using the required shape: `rooms/{roomId}/messages/{messageId}/{attachmentId}-{safeFileName}`. The original filename is preserved only as metadata; storage paths use a sanitized filename segment and a server-generated attachment UUID.
+- Replaced text-only `anytext_create_message` with a message-plus-attachment RPC. It creates the message, validates attachment count/size, conservatively classifies common images as `image` and everything else as `download`, registers pending attachment metadata, and returns upload targets.
+- Added `anytext_mark_attachment_uploaded` and `anytext_finalize_message_uploads`. The frontend only shows finalized uploaded attachments in normal list/detail views.
+- Added a private Storage INSERT policy for `anytext-attachments` that allows uploads only to an active pending attachment path already registered by backend metadata. The policy uses a `security definer` helper so anon clients do not receive direct `attachments` table read access.
+- Added the `anytext-create-download-url` Edge Function. The browser requests a URL by `roomId`, `messageId`, and `attachmentId`; the function validates the scoped target through RPC and uses the service role server-side to create a short-lived signed Storage URL.
+- Kept bucket listing and broad public paths unavailable to the frontend. There is no Storage SELECT policy for broad client reads; downloads and image previews use per-attachment signed URLs.
+- Updated delete behavior: `anytext_delete_message` soft-deletes the message, soft-deletes its attachments, and marks attachment rows `cleanup_pending = true`. Physical Storage removal remains a later cleanup job, but user-facing list/download access is blocked immediately after delete.
+- Re-enabled composer attachment selection with drag/drop and file picker support. Selected files show per-file status/progress rails, can be removed, and are retained on failed send so the user can retry or remove them.
+- Queue/detail views now show attachment counts, image thumbnails, large image preview modal, signed download actions, and download-only rows for PDF/zip/doc-style files.
+
+Storage URL strategy:
+
+- Upload: backend RPC registers a pending attachment row and returns one exact `storage_path`; the frontend asks Supabase Storage for a signed upload URL for that path. The Storage INSERT policy rejects paths without matching active pending metadata.
+- Download/preview: frontend never signs Storage paths directly. It invokes `anytext-create-download-url`, which validates room/message/attachment scope and returns a short-lived signed URL for one object.
+- Broad listing: anon Storage list calls do not expose objects or prefixes for `anytext-attachments`.
+
+Delete and cleanup strategy:
+
+- Manual delete immediately hides the message from all normal list queries and realtime-connected devices.
+- Attachment metadata is soft-deleted and marked `cleanup_pending` during the same backend delete flow.
+- Physical object deletion is intentionally deferred to a scheduled cleanup phase so the MVP does not require exposing service-role cleanup logic to the browser.
+
+Verification completed:
+
+- `npm run lint && npm test && npm run build` passed after the attachment implementation. Vitest covered 5 files and 30 tests.
+- `supabase db push` applied migrations `20260624160000` and `20260624162000` to project `cizmpumlliowigimhwqr`.
+- `supabase functions deploy anytext-create-download-url` deployed the Edge Function to the linked project.
+- Real Supabase smoke verified: message creation with image/PDF/zip metadata, signed upload URL creation, Storage upload, mark uploaded, finalize, list with 3 attachments, image and file signed URLs fetch with HTTP 200, too-many and over-25MB backend rejection, delete hiding, post-delete download URL rejection, and `cleanup_pending` on all deleted attachments.
+- Browser verification used the in-app Browser for desktop/mobile layout, signed attachment rendering, image preview modal, file download links, and two-tab delete sync. The in-app Browser file upload API was not available, so Google Chrome headless through CDP was used for the file-picker-specific checks without adding repo dependencies.
+- Chrome CDP browser verification covered Markdown+image send, Markdown+PDF+zip send, signed download anchors, more-than-10 attachment inline validation, over-25MB inline validation, reduced-motion media emulation, and basic Tab focus entry.
+
+Known follow-up:
+
+- A scheduled physical Storage cleanup job is still needed for expired/deleted rows with `cleanup_pending = true`.
+- Production build still emits the non-failing Tabler barrel/chunk-size warning noted in earlier goals.
