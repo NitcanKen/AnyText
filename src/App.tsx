@@ -297,7 +297,9 @@ function App() {
       );
       const itemWithUrls = await hydrateQueueItemAttachmentUrls(client, roomKey, item);
 
-      setQueueItems((items) => getActiveQueueItems([itemWithUrls, ...items]));
+      setQueueItems((items) =>
+        getActiveQueueItems([itemWithUrls, ...items.filter((existingItem) => existingItem.id !== itemWithUrls.id)]),
+      );
       setSelectedId(itemWithUrls.id);
       setMarkdown('');
       attachments.forEach((attachment) => {
