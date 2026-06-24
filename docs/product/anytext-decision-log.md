@@ -157,6 +157,14 @@ Verification completed:
 - The same anon-key smoke test confirmed direct broad `messages` table select is blocked with Postgres error code `42501`.
 - A two-client Supabase Realtime smoke test confirmed one client receives INSERT and soft-delete UPDATE broadcasts caused by another client's RPC calls.
 
+Additional verification completed after merge to `main`:
+
+- Confirmed `main` is aligned with `origin/main` and the Supabase project `cizmpumlliowigimhwqr` is linked and `ACTIVE_HEALTHY`.
+- Confirmed remote migrations `20260624143000` and `20260624145500` are applied.
+- Re-ran `npm run lint`, `npm test`, and `npm run build` successfully.
+- Verified anon/publishable clients cannot directly read `rooms` or `messages`; both direct table reads are blocked with `permission denied`.
+- Verified two isolated browser profiles against the local app and real Supabase backend: create room, join by link, refresh persistence, send Markdown with two code blocks, realtime insert sync, exact per-code-block copy, script sanitization, and delete sync.
+
 Current blocker:
 
-- In-app Browser verification could not be completed because the Browser runtime rejected `http://localhost:5173/AnyText/` under its URL policy. The requested desktop/mobile/two-browser-profile UI verification is therefore still unproven even though CLI tests, build, Supabase RPC, RLS, and realtime smoke checks pass.
+- None for Goal 2. Attachment upload/download, signed URLs, and storage cleanup remain intentionally deferred to Goal 3.
