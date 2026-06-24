@@ -122,6 +122,7 @@ describe('AnyText expiry and queue helpers', () => {
     const now = new Date('2026-06-24T12:00:00.000Z');
 
     expect(formatTimeRemaining('2026-06-24T13:00:00.000Z', now)).toBe('1h left');
+    expect(formatTimeRemaining('2026-06-24T13:01:00.000Z', now)).toBe('1h left');
     expect(formatTimeRemaining('2026-06-24T12:42:00.000Z', now)).toBe('42m left');
     expect(formatTimeRemaining('2026-06-24T12:00:30.000Z', now)).toBe('<1m left');
     expect(getItemTimeState('2026-06-24T11:59:59.000Z', now)).toEqual({

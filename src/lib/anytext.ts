@@ -175,7 +175,7 @@ export function formatTimeRemaining(expiresAt: string, now = new Date()): string
     return `${minutes}m left`;
   }
 
-  const hours = Math.ceil(minutes / 60);
+  const hours = Math.max(1, Math.floor(minutes / 60));
 
   return `${hours}h left`;
 }
