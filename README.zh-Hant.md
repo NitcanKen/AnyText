@@ -14,6 +14,8 @@
   <img src="docs/assets/anytext-hero.png" alt="AnyText 深色 Command Deck，用於在裝置之間傳送 Markdown 與檔案" width="100%">
 </p>
 
+WhatsApp 和 Discord 太像聊天工具，不適合只為了把一段 command、截圖或 ChatGPT 回答搬到自己的另一部裝置。Notion 又太重，很多時候你只是需要一次臨時交接，不需要再開一個 page、workspace 或 database。
+
 AnyText 是一個輕量的跨裝置 relay board，面向開發者和技術使用者。它解決的是很小但很常見的日常斷點：ChatGPT 或某個工具在這部裝置給了你一段 Markdown、命令、截圖或檔案，但你現在需要在另一部自己的裝置上使用。
 
 它不是筆記工具、團隊工作區、聊天工具、公開檔案分享服務或長期資料庫。內容需要手動送出，會進入臨時 queue，並在 1 小時後從 queue 隱藏。

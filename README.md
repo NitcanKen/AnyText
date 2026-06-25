@@ -14,6 +14,8 @@
   <img src="docs/assets/anytext-hero.png" alt="AnyText hero showing a dark command deck for moving Markdown and files between devices" width="100%">
 </p>
 
+WhatsApp and Discord are too chat-shaped for moving a command, screenshot, or ChatGPT answer between your own devices. Notion is too heavy when you only need a temporary handoff, not another page, workspace, or database.
+
 AnyText is a lightweight cross-device relay board for developers and technical users who move Markdown, code, commands, screenshots, and files between their own devices. It is built for the small daily gap between "ChatGPT gave me something useful on this device" and "I need it on that other device now."
 
 It is not a notes app, team workspace, chat app, public file-sharing service, or long-term archive. Items are temporary, manually sent, and designed to disappear from the queue after one hour.
