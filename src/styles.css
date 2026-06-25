@@ -137,6 +137,40 @@ a:focus-visible {
     padding: 0.625rem;
   }
 
+  .attachment-progress-slot {
+    height: 0.25rem;
+    margin-top: 0.5rem;
+  }
+
+  .progress-track {
+    position: relative;
+    height: 0.25rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: inherit;
+    background: #befc3c;
+    transition: width 150ms ease;
+  }
+
+  .progress-fill-indeterminate {
+    position: absolute;
+    inset-block: 0;
+    left: -35%;
+    width: 35%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, transparent, #befc3c 45%, #befc3c 55%, transparent);
+    animation: progress-indeterminate 1100ms ease-in-out infinite;
+  }
+
+  .progress-fill-error {
+    background: #fca5a5;
+  }
+
   .attachment-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
@@ -641,6 +675,16 @@ a:focus-visible {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes progress-indeterminate {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(390%);
   }
 }
 

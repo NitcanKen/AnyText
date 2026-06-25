@@ -19,7 +19,7 @@ export function getInitialRoomKey(): string {
 }
 
 export function saveRoomKey(roomKey: string): void {
-  localStorage.setItem(ROOM_KEY_STORAGE, roomKey);
+  localStorage.setItem(ROOM_KEY_STORAGE, normalizeRoomKeyInput(roomKey));
 }
 
 export function clearRoomKey(): void {
@@ -41,11 +41,26 @@ export function buildJoinLink(roomKey: string, baseUrl?: URL): string {
   return url.toString();
 }
 
+export function normalizeRoomKeyInput(roomKey: string): string {
+  return roomKey.replace(/\s+/g, '').trim();
+}
+
+export function formatManualPairingCode(roomKey: string): string {
+  const normalized = normalizeRoomKeyInput(roomKey);
+  const match = /^(\d{3})(\d{3})([!@#$%^&*])$/.exec(normalized);
+
+  if (!match) {
+    return normalized;
+  }
+
+  return `${match[1]} ${match[2]} ${match[3]}`;
+}
+
 function getRoomKeyFromCurrentUrl(): string {
   const url = new URL(window.location.href);
   const roomKey = url.searchParams.get('room') ?? url.searchParams.get('roomKey') ?? '';
 
-  return roomKey.trim();
+  return normalizeRoomKeyInput(roomKey);
 }
 
 function getCurrentBaseUrl(): URL {

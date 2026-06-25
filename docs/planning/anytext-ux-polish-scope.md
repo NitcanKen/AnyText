@@ -1,8 +1,29 @@
 # AnyText UX Polish Scope
 
-Status: proposed scope for the next UX polish pass  
+Status: implemented on 2026-06-25
 Date: 2026-06-25  
 Owner: Command Deck product/design implementation
+
+## Implementation Status
+
+Implemented on 2026-06-25:
+
+- Ready attachments now show `Ready` metadata only, with no progress rail or fake percentage before `Send`.
+- Send lifecycle now distinguishes draft, validating, uploading, publishing, sent, and failed states.
+- Attachment upload rails are indeterminate while exact browser upload progress is unavailable; the old fake 80% overall rail and fake per-file percentages were removed.
+- Messages with attachments are created as backend `draft` rows and become visible only after `anytext_finalize_message_uploads` marks them `published`.
+- Realtime handling now refreshes the authoritative published list instead of rendering raw message table payloads that can lack attachments.
+- Queue rows now show scannable attachment summaries such as `1 image`, `2 files`, or `1 image + 1 file`.
+- Copy feedback now distinguishes `Markdown copied`, `Code copied`, and `Command copied`.
+- Manual pairing code display now groups codes as `126 393 $`; input normalizes spaces back to the raw value.
+
+Verification:
+
+- `supabase db push --linked` applied migration `20260625024500_add_message_publish_status.sql`.
+- `npm test` passed with 33 tests.
+- `npm run lint` passed.
+- `npm run build` passed with only the known non-failing Tabler barrel/chunk-size warning.
+- Browser checks covered desktop, mobile, keyboard tab order, reduced motion, selected attachment ready state, cross-tab attachment send, and receiver arrival without `0 attachments`.
 
 ## Purpose
 

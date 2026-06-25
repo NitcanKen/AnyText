@@ -90,6 +90,7 @@ type MessageRow = {
   created_at: string;
   expires_at: string;
   deleted_at: string | null;
+  publish_status?: 'draft' | 'published' | 'failed';
   attachments?: AttachmentRow[];
 };
 
@@ -147,6 +148,7 @@ export async function createMessage(
   options: {
     attachments?: Array<{ clientId: string; file: File }>;
     onAttachmentProgress?: (progress: AttachmentUploadProgress) => void;
+    onPublishStart?: () => void;
   } = {},
 ): Promise<QueueItem> {
   const attachments = options.attachments ?? [];
@@ -167,6 +169,10 @@ export async function createMessage(
   }
 
   const roomId = await hashRoomKey(roomKey);
+  if (attachments.length === 0) {
+    options.onPublishStart?.();
+  }
+
   let row = await callRpc<MessageRow>(client, 'anytext_create_message', {
     p_room_id: roomId,
     p_markdown_text: markdown,
@@ -181,6 +187,7 @@ export async function createMessage(
 
     try {
       await uploadAttachments(client, roomId, row, attachments, options.onAttachmentProgress);
+      options.onPublishStart?.();
       row = await callRpc<MessageRow>(client, 'anytext_finalize_message_uploads', {
         p_room_id: roomId,
         p_message_id: row.id,
@@ -219,6 +226,10 @@ export function applyMessageRealtimeEvent(items: QueueItem[], event: MessageReal
   }
 
   const withoutCurrent = items.filter((item) => item.id !== row.id);
+
+  if (row.publish_status && row.publish_status !== 'published') {
+    return withoutCurrent;
+  }
 
   if (row.deleted_at || new Date(row.expires_at).getTime() <= now.getTime()) {
     return getActiveQueueItems(withoutCurrent, now);
@@ -421,7 +432,7 @@ async function uploadAttachments(
       onAttachmentProgress?.({
         clientId: attachment.clientId,
         fileName: attachment.file.name,
-        progress: 8,
+        progress: 0,
         status: 'signing',
       });
 
@@ -434,7 +445,7 @@ async function uploadAttachments(
       onAttachmentProgress?.({
         clientId: attachment.clientId,
         fileName: attachment.file.name,
-        progress: 45,
+        progress: 0,
         status: 'uploading',
       });
 
@@ -465,7 +476,7 @@ async function uploadAttachments(
         clientId: attachment.clientId,
         fileName: attachment.file.name,
         message: error instanceof Error ? error.message : `${attachment.file.name} upload failed.`,
-        progress: 100,
+        progress: 0,
         status: 'failed',
       });
       throw error;

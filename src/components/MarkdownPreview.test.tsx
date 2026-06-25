@@ -46,8 +46,9 @@ describe('MarkdownPreview', () => {
     const codeBlock = screen.getByTestId('code-block-sh');
     expect(codeBlock).toHaveClass('shell-block');
 
-    await user.click(within(codeBlock).getByRole('button', { name: /copy code block/i }));
+    await user.click(within(codeBlock).getByRole('button', { name: /copy command/i }));
     await waitFor(() => expect(copyTextMock).toHaveBeenCalledWith('npm test\nnpm run build'));
+    expect(within(codeBlock).getByRole('button', { name: /command copied/i })).toBeInTheDocument();
   });
 
   it('adds copy controls to unlabeled fenced code blocks', async () => {
@@ -69,6 +70,7 @@ describe('MarkdownPreview', () => {
     await user.click(within(codeBlock).getByRole('button', { name: /copy code block/i }));
 
     await waitFor(() => expect(copyTextMock).toHaveBeenCalledWith('plain fence command\nnpm run test'));
+    expect(within(codeBlock).getByRole('button', { name: /code copied/i })).toBeInTheDocument();
   });
 
   it('keeps inline code inline without a block copy control', () => {

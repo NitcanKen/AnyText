@@ -155,6 +155,7 @@ describe('Supabase RPC relay boundary', () => {
     const storagePath =
       'rooms/ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad/messages/7e34c8d2-d926-4473-8975-28cad36785b2/32adbc27-3d7b-42da-92ea-e08bc24ef3de-screen.png';
     const file = new File([new Uint8Array([1, 2, 3])], 'screen.png', { type: 'image/png' });
+    const onAttachmentProgress = vi.fn();
     const client = makeStorageClient({
       anytext_create_message: messageRow({
         attachments: [
@@ -175,7 +176,7 @@ describe('Supabase RPC relay boundary', () => {
     await expect(
       createMessage(client, roomKey, '# With image', 'iPad', {
         attachments: [{ clientId: 'client-1', file }],
-        onAttachmentProgress: vi.fn(),
+        onAttachmentProgress,
       }),
     ).resolves.toMatchObject({
       attachments: [
@@ -219,6 +220,15 @@ describe('Supabase RPC relay boundary', () => {
       p_message_id: '7e34c8d2-d926-4473-8975-28cad36785b2',
       p_room_id: roomId,
     });
+    expect(onAttachmentProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: 'client-1', progress: 0, status: 'signing' }),
+    );
+    expect(onAttachmentProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: 'client-1', progress: 0, status: 'uploading' }),
+    );
+    expect(onAttachmentProgress).toHaveBeenCalledWith(
+      expect.objectContaining({ clientId: 'client-1', progress: 100, status: 'uploaded' }),
+    );
   });
 
   it('creates short-lived download URLs through the restricted Edge Function', async () => {
@@ -275,6 +285,15 @@ describe('Supabase RPC relay boundary', () => {
     });
 
     expect(deleted).toEqual([]);
+  });
+
+  it('ignores draft realtime rows before they are published', () => {
+    const inserted = applyMessageRealtimeEvent([], {
+      event: 'INSERT',
+      payload: { new: messageRow({ publish_status: 'draft' }) },
+    });
+
+    expect(inserted).toEqual([]);
   });
 
   it('understands Supabase broadcast_changes record payloads', () => {

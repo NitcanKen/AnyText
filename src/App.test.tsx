@@ -126,14 +126,15 @@ describe('AnyText Command Deck app', () => {
       'test-room-key',
       markdown,
       'MacBook',
-      { attachments: [] },
+      expect.objectContaining({ attachments: [] }),
     );
 
     await user.click(screen.getByRole('button', { name: /copy markdown/i }));
     await waitFor(() => expect(copyTextMock).toHaveBeenLastCalledWith(markdown));
+    expect(await screen.findByRole('button', { name: /markdown copied/i })).toBeInTheDocument();
 
     const codeBlock = screen.getByTestId('code-block-bash');
-    await user.click(within(codeBlock).getByRole('button', { name: /copy code block/i }));
+    await user.click(within(codeBlock).getByRole('button', { name: /copy command/i }));
     await waitFor(() => expect(copyTextMock).toHaveBeenLastCalledWith('npm run build'));
 
     await user.click(screen.getByRole('button', { name: /delete message/i }));
@@ -188,8 +189,10 @@ describe('AnyText Command Deck app', () => {
 
     expect(screen.getByText('screen.png')).toBeInTheDocument();
     expect(screen.getByText('brief.pdf')).toBeInTheDocument();
+    expect(screen.getAllByText(/Ready/)).toHaveLength(2);
+    expect(screen.queryByRole('progressbar', { name: /uploading|preparing/i })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^send$/i }));
+    await user.click(screen.getByRole('button', { name: /send 2 files/i }));
 
     await screen.findByRole('button', { name: /attachments/i });
     expect(relayMocks.createMessage).toHaveBeenCalledWith(
@@ -242,7 +245,7 @@ describe('AnyText Command Deck app', () => {
     await user.upload(screen.getByLabelText(/select attachments/i), tooMany);
 
     expect(screen.getByText('Maximum 10 attachments.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^send/i })).toBeDisabled();
 
     await user.click(screen.getByLabelText('Remove file-0.txt'));
 
@@ -251,7 +254,7 @@ describe('AnyText Command Deck app', () => {
     await user.upload(screen.getByLabelText(/select attachments/i), [large]);
 
     expect(screen.getByText('large.zip is over 25MB.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^send$/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /^send/i })).toBeDisabled();
   });
 
   it('hides an expired selected item from the queue while keeping an expired detail state', async () => {

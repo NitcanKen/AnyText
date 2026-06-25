@@ -51,16 +51,17 @@ import {
 import { copyText } from './lib/clipboard';
 import { cx } from './lib/cx';
 import {
+  buildJoinLink,
   clearRoomKey,
+  formatManualPairingCode,
   getInitialDeviceName,
   getInitialRoomKey,
+  normalizeRoomKeyInput,
   saveDeviceName,
   saveRoomKey,
-  buildJoinLink,
 } from './lib/pairing';
 import { getSupabaseClient, isSupabaseConfigured } from './lib/supabaseClient';
 import {
-  applyMessageRealtimeEvent,
   createAttachmentDownloadUrl,
   createMessage as createSupabaseMessage,
   createRoom,
@@ -74,7 +75,6 @@ import {
 } from './lib/supabaseRelay';
 
 type QueueLoadClient = AnyTextRpcClient & AnyTextFunctionsClient;
-
 interface SelectedAttachment {
   id: string;
   file: File;
@@ -85,7 +85,8 @@ interface SelectedAttachment {
   error?: string;
 }
 
-type SendState = 'idle' | 'sending' | 'sent' | 'failed';
+type SendState = 'draft_empty' | 'draft_ready' | 'validating' | 'uploading' | 'publishing' | 'sent' | 'failed';
+const BUSY_SEND_STATES = new Set<SendState>(['validating', 'uploading', 'publishing']);
 type QueueStatus = 'idle' | 'loading' | 'error';
 type MobileTab = 'send' | 'queue';
 type SyncStatus = 'connecting' | RealtimeStatus;
@@ -100,7 +101,7 @@ function App() {
   const [attachmentErrors, setAttachmentErrors] = useState<string[]>([]);
   const [queueItems, setQueueItems] = useState<QueueItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [sendState, setSendState] = useState<SendState>('idle');
+  const [sendState, setSendState] = useState<SendState>('draft_empty');
   const [queueStatus, setQueueStatus] = useState<QueueStatus>('idle');
   const [activeTab, setActiveTab] = useState<MobileTab>('send');
   const [imagePreview, setImagePreview] = useState<QueueAttachment | null>(null);
@@ -151,9 +152,8 @@ function App() {
         setQueueStatus('idle');
 
         const subscription = await subscribeToRoomMessages(client, roomKey, {
-          onEvent: (event) => {
+          onEvent: () => {
             if (!cancelled) {
-              setQueueItems((currentItems) => applyMessageRealtimeEvent(currentItems, event));
               void loadQueueWithAttachmentUrls(client, roomKey)
                 .then((freshItems) => {
                   if (!cancelled) {
@@ -217,8 +217,15 @@ function App() {
   const selectedItem = selectedStoredItem ?? activeItems[0] ?? null;
   const selectedItemExpired = selectedStoredItem ? getItemTimeState(selectedStoredItem.expiresAt, now).expired : false;
   const hasDraftContent = markdown.trim().length > 0 || attachments.length > 0;
+  const sendBusy = BUSY_SEND_STATES.has(sendState);
+  const visibleSendState =
+    sendBusy || sendState === 'sent' || sendState === 'failed'
+      ? sendState
+      : hasDraftContent
+        ? 'draft_ready'
+        : 'draft_empty';
   const sendDisabled =
-    sendState === 'sending' ||
+    sendBusy ||
     !isSupabaseConfigured() ||
     !markdownValidation.valid ||
     attachmentErrors.length > 0 ||
@@ -235,7 +242,7 @@ function App() {
           setShowPairing(true);
         }}
         onJoin={(key) => {
-          const trimmedKey = key.trim();
+          const trimmedKey = normalizeRoomKeyInput(key);
 
           if (!trimmedKey) {
             return;
@@ -268,6 +275,7 @@ function App() {
 
     setAttachments(nextAttachments);
     setAttachmentErrors(validateAttachments(nextAttachments.map((attachment) => attachment.file)));
+    resetSendStateForDraft(markdown, nextAttachments);
   }
 
   function removeAttachment(id: string) {
@@ -278,6 +286,7 @@ function App() {
     }
     setAttachments(nextAttachments);
     setAttachmentErrors(validateAttachments(nextAttachments.map((attachment) => attachment.file)));
+    resetSendStateForDraft(markdown, nextAttachments);
   }
 
   async function sendMessage() {
@@ -285,7 +294,7 @@ function App() {
       return;
     }
 
-    setSendState('sending');
+    setSendState('validating');
 
     try {
       const client = getSupabaseClient();
@@ -298,8 +307,9 @@ function App() {
           ? {
               attachments: attachments.map((attachment) => ({ clientId: attachment.id, file: attachment.file })),
               onAttachmentProgress: updateAttachmentProgress,
+              onPublishStart: () => setSendState('publishing'),
             }
-          : { attachments: [] },
+          : { attachments: [], onPublishStart: () => setSendState('publishing') },
       );
       const itemWithUrls = await hydrateQueueItemAttachmentUrls(client, roomKey, item);
 
@@ -317,7 +327,7 @@ function App() {
       setAttachmentErrors([]);
       setSendState('sent');
       setActiveTab('queue');
-      window.setTimeout(() => setSendState('idle'), 1200);
+      window.setTimeout(() => setSendState('draft_empty'), 1200);
     } catch (error) {
       setBackendError(getErrorMessage(error));
       setSendState('failed');
@@ -362,6 +372,10 @@ function App() {
   }
 
   function updateAttachmentProgress(progress: AttachmentUploadProgress) {
+    if (progress.status === 'signing' || progress.status === 'uploading') {
+      setSendState('uploading');
+    }
+
     setAttachments((current) =>
       current.map((attachment) =>
         attachment.id === progress.clientId
@@ -383,6 +397,12 @@ function App() {
     setQueueItems([]);
     setSelectedId(null);
     setMenuOpen(false);
+  }
+
+  function resetSendStateForDraft(nextMarkdown: string, nextAttachments: SelectedAttachment[]) {
+    if (sendState === 'failed' || sendState === 'sent' || sendState === 'draft_empty' || sendState === 'draft_ready') {
+      setSendState(nextMarkdown.trim().length > 0 || nextAttachments.length > 0 ? 'draft_ready' : 'draft_empty');
+    }
   }
 
   return (
@@ -433,6 +453,7 @@ function App() {
             manualCode={roomKey}
             onClose={() => setShowPairing(false)}
             onCopyJoinLink={() => copyMarkdown(joinLink)}
+            onCopyPairingCode={() => copyMarkdown(roomKey)}
           />
         ) : null}
 
@@ -446,11 +467,14 @@ function App() {
               markdown={markdown}
               markdownValidation={markdownValidation}
               onAddFiles={addFiles}
-              onMarkdownChange={setMarkdown}
+              onMarkdownChange={(value) => {
+                setMarkdown(value);
+                resetSendStateForDraft(value, attachments);
+              }}
               onRemoveAttachment={removeAttachment}
               onSend={sendMessage}
               sendDisabled={sendDisabled}
-              sendState={sendState}
+              sendState={visibleSendState}
             />
           </section>
 
@@ -523,7 +547,7 @@ function FirstRunScreen({ onCreate, onJoin }: FirstRunScreenProps) {
                 autoCapitalize="none"
                 autoCorrect="off"
                 inputMode="text"
-                placeholder="123456!"
+                placeholder="126 393 $"
                 spellCheck={false}
                 value={joinKey}
               />
@@ -755,9 +779,12 @@ interface PairingCardProps {
   manualCode: string;
   onClose: () => void;
   onCopyJoinLink: () => void;
+  onCopyPairingCode: () => void;
 }
 
-function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink }: PairingCardProps) {
+function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink, onCopyPairingCode }: PairingCardProps) {
+  const formattedManualCode = formatManualPairingCode(manualCode);
+
   return (
     <section className="panel p-4">
       <div className="flex items-start justify-between gap-4">
@@ -784,9 +811,13 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink }: PairingC
           <div>
             <p className="label">Pairing code</p>
             <code className="mt-1 block select-all rounded border border-lime-300/20 bg-lime-300/10 px-3 py-2 font-mono text-xl font-semibold text-lime-100">
-              {manualCode}
+              {formattedManualCode}
             </code>
           </div>
+          <button className="secondary-button w-full justify-center" onClick={onCopyPairingCode} type="button">
+            <IconCopy aria-hidden size={16} />
+            Copy code
+          </button>
           <button className="secondary-button w-full justify-center" onClick={onCopyJoinLink} type="button">
             <IconCopy aria-hidden size={16} />
             Copy join link
@@ -915,29 +946,19 @@ function Composer({
         <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
 
         <div className="mt-auto border-t border-white/10 pt-3">
-          {sendState === 'sending' ? (
-            <div className="mb-3">
-              <div className="mb-1 flex justify-between text-xs text-slate-400">
-                <span>Writing to Supabase relay</span>
-                <span>80%</span>
-              </div>
-              <div className="h-1 overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-4/5 rounded-full bg-lime-300 motion-safe:animate-pulse" />
-              </div>
-            </div>
-          ) : null}
+          <SendProgress sendState={sendState} attachmentCount={attachments.length} />
           {sendState === 'failed' ? <InlineAlert message={backendError || 'Send failed. Retry after refreshing sync.'} /> : null}
           <button className="send-button" disabled={sendDisabled} onClick={onSend} type="button">
-            {sendState === 'sending' ? (
+            {BUSY_SEND_STATES.has(sendState) ? (
               <IconLoader2 aria-hidden className="motion-safe:animate-spin" size={18} />
             ) : sendState === 'sent' ? (
               <IconCheck aria-hidden size={18} />
             ) : (
               <IconSend aria-hidden size={18} />
             )}
-            {sendState === 'sending' ? 'Sending' : sendState === 'sent' ? 'Sent' : 'Send'}
+            {sendButtonLabel(sendState, attachments.length)}
           </button>
-          {sendDisabled && sendState !== 'sending' && !markdownValidation.message && attachmentErrors.length === 0 ? (
+          {sendDisabled && !BUSY_SEND_STATES.has(sendState) && !markdownValidation.message && attachmentErrors.length === 0 ? (
             <p className="mt-2 text-xs text-slate-500">
               Add Markdown or attachments to send.
             </p>
@@ -946,6 +967,64 @@ function Composer({
       </div>
     </section>
   );
+}
+
+function SendProgress({ attachmentCount, sendState }: { attachmentCount: number; sendState: SendState }) {
+  if (!BUSY_SEND_STATES.has(sendState)) {
+    return null;
+  }
+
+  const label =
+    sendState === 'validating'
+      ? 'Checking limits'
+      : sendState === 'uploading'
+        ? attachmentCount === 1
+          ? 'Uploading 1 file'
+          : `Uploading ${attachmentCount} files`
+        : 'Publishing relay item';
+
+  return (
+    <div className="mb-3" aria-busy="true">
+      <div className="mb-1 flex justify-between text-xs text-slate-400">
+        <span>{label}</span>
+      </div>
+      <div aria-label={label} className="progress-track" role="progressbar">
+        <div className="progress-fill-indeterminate" />
+      </div>
+    </div>
+  );
+}
+
+function sendButtonLabel(sendState: SendState, attachmentCount: number): string {
+  if (sendState === 'validating') {
+    return 'Checking';
+  }
+
+  if (sendState === 'uploading') {
+    return 'Sending';
+  }
+
+  if (sendState === 'publishing') {
+    return 'Publishing';
+  }
+
+  if (sendState === 'sent') {
+    return 'Sent';
+  }
+
+  if (sendState === 'failed') {
+    return 'Retry send';
+  }
+
+  if (attachmentCount === 1) {
+    return 'Send 1 file';
+  }
+
+  if (attachmentCount > 1) {
+    return `Send ${attachmentCount} files`;
+  }
+
+  return 'Send';
 }
 
 interface AttachmentListProps {
@@ -970,20 +1049,13 @@ function AttachmentList({ attachments, onRemove }: AttachmentListProps) {
             <p className="font-mono text-[11px] text-slate-500">
               {formatBytes(attachment.file.size)} · {attachment.file.type || 'file'} · {attachmentStatusLabel(attachment)}
             </p>
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/10">
-              <div
-                className={cx(
-                  'h-full rounded-full transition-[width] duration-150',
-                  attachment.status === 'failed' ? 'bg-red-300' : 'bg-lime-300',
-                )}
-                style={{ width: `${attachmentProgressValue(attachment)}%` }}
-              />
-            </div>
+            <AttachmentProgress attachment={attachment} />
             {attachment.error ? <p className="mt-1 text-xs text-red-200">{attachment.error}</p> : null}
           </div>
           <button
             aria-label={`Remove ${attachment.file.name}`}
             className="icon-button"
+            disabled={!canRemoveAttachment(attachment)}
             onClick={() => onRemove(attachment.id)}
             type="button"
           >
@@ -993,6 +1065,39 @@ function AttachmentList({ attachments, onRemove }: AttachmentListProps) {
       ))}
     </div>
   );
+}
+
+function AttachmentProgress({ attachment }: { attachment: SelectedAttachment }) {
+  if (attachment.status === 'ready') {
+    return <div className="attachment-progress-slot" aria-hidden />;
+  }
+
+  const label = `${attachmentStatusLabel(attachment)} ${attachment.file.name}`;
+  const isIndeterminate = attachment.status === 'signing' || attachment.status === 'uploading';
+
+  return (
+    <div
+      aria-label={label}
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={isIndeterminate ? undefined : attachment.progress}
+      className="progress-track mt-2"
+      role="progressbar"
+    >
+      <div
+        className={cx(
+          'progress-fill',
+          isIndeterminate && 'progress-fill-indeterminate',
+          attachment.status === 'failed' && 'progress-fill-error',
+        )}
+        style={isIndeterminate ? undefined : { width: `${attachment.progress}%` }}
+      />
+    </div>
+  );
+}
+
+function canRemoveAttachment(attachment: SelectedAttachment): boolean {
+  return attachment.status === 'ready' || attachment.status === 'failed';
 }
 
 interface QueuePanelProps {
@@ -1179,7 +1284,8 @@ interface QueueRowProps {
 }
 
 function QueueRow({ item, now, onDelete, onSelect, selected }: QueueRowProps) {
-  const excerpt = getMarkdownExcerpt(item);
+  const title = getQueueItemTitle(item);
+  const attachmentSummary = getAttachmentSummary(item.attachments);
   const imageCount = item.attachments.filter((attachment) => attachment.previewKind === 'image').length;
   const fileCount = item.attachments.length - imageCount;
 
@@ -1188,14 +1294,20 @@ function QueueRow({ item, now, onDelete, onSelect, selected }: QueueRowProps) {
       <button className="queue-row" onClick={() => onSelect(item.id)} title="Open queue item" type="button">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-slate-100">{excerpt}</p>
+            <p className="truncate text-sm font-medium text-slate-100">{title}</p>
             <p className="mt-1 font-mono text-[11px] text-slate-500">
               {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
+              {attachmentSummary ? ` · ${attachmentSummary}` : ''}
             </p>
           </div>
-          <div className="shrink-0 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400">
-            {item.attachments.length}
-          </div>
+          {item.attachments.length > 0 ? (
+            <div
+              aria-label={attachmentSummary}
+              className="shrink-0 rounded border border-white/10 px-1.5 py-0.5 font-mono text-[10px] text-slate-400"
+            >
+              {item.attachments.length}
+            </div>
+          ) : null}
         </div>
         <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
           {imageCount > 0 ? (
@@ -1257,7 +1369,7 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="label">Detail</p>
-          <h3 className="text-base font-semibold text-slate-100">{getMarkdownExcerpt(item)}</h3>
+          <h3 className="text-base font-semibold text-slate-100">{getQueueItemTitle(item)}</h3>
           <p className="mt-1 font-mono text-[11px] text-slate-500">
             {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
           </p>
@@ -1265,7 +1377,7 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
         <div className="flex flex-wrap gap-2">
           <button className="secondary-button" onClick={copyMarkdown} type="button">
             {copyState === 'copied' ? <IconCheck aria-hidden size={15} /> : <IconCopy aria-hidden size={15} />}
-            {copyState === 'copied' ? 'Copied' : copyState === 'failed' ? 'Failed' : 'Copy Markdown'}
+            {copyState === 'copied' ? 'Markdown copied' : copyState === 'failed' ? 'Copy failed' : 'Copy Markdown'}
           </button>
           <button className="danger-button" onClick={() => onDeleteMessage(item.id)} type="button">
             <IconTrash aria-hidden size={15} />
@@ -1465,37 +1577,29 @@ async function hydrateQueueItemAttachmentUrls(
 
 function attachmentStatusLabel(attachment: SelectedAttachment): string {
   if (attachment.status === 'ready') {
-    return 'ready';
+    return 'Ready';
   }
 
   if (attachment.status === 'signing') {
-    return 'preparing upload';
+    return 'Preparing upload';
   }
 
   if (attachment.status === 'uploading') {
-    return 'uploading';
+    return 'Uploading';
   }
 
   if (attachment.status === 'uploaded') {
-    return 'uploaded';
+    return 'Uploaded';
   }
 
   if (attachment.status === 'failed') {
-    return 'failed';
+    return 'Failed';
   }
 
-  return 'queued';
+  return 'Queued';
 }
 
-function attachmentProgressValue(attachment: SelectedAttachment): number {
-  if (attachment.status === 'ready') {
-    return 6;
-  }
-
-  return attachment.progress;
-}
-
-function getMarkdownExcerpt(item: QueueItem): string {
+function getQueueItemTitle(item: QueueItem): string {
   const text = item.markdown
     .replace(/```[\s\S]*?```/g, ' code block ')
     .replace(/[#>*_`|[\]-]/g, ' ')
@@ -1506,7 +1610,27 @@ function getMarkdownExcerpt(item: QueueItem): string {
     return text.length > 92 ? `${text.slice(0, 92)}...` : text;
   }
 
-  return item.attachments.length === 1 ? '1 attachment' : `${item.attachments.length} attachments`;
+  return getAttachmentSummary(item.attachments) || 'Markdown note';
+}
+
+function getAttachmentSummary(attachments: QueueAttachment[]): string {
+  if (attachments.length === 0) {
+    return '';
+  }
+
+  const imageCount = attachments.filter((attachment) => attachment.previewKind === 'image').length;
+  const fileCount = attachments.length - imageCount;
+  const parts: string[] = [];
+
+  if (imageCount > 0) {
+    parts.push(imageCount === 1 ? '1 image' : `${imageCount} images`);
+  }
+
+  if (fileCount > 0) {
+    parts.push(fileCount === 1 ? '1 file' : `${fileCount} files`);
+  }
+
+  return parts.join(' + ');
 }
 
 function syncStatusLabel(status: SyncStatus): string {

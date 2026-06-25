@@ -283,3 +283,23 @@ Implemented on 2026-06-25:
 Reason for spec deviation:
 
 - This intentionally trades high entropy for much lower device-join friction. AnyText remains scoped to temporary, low-sensitivity transfer with one-hour expiry, manual delete, and no end-to-end encryption.
+
+## Implementation Note: UX Polish Publish Gating
+
+Implemented on 2026-06-25:
+
+- Added `messages.publish_status` with `draft`, `published`, and `failed` states.
+- Messages with attachments are created as `draft` while Storage objects upload and attachment metadata is marked uploaded.
+- `anytext_finalize_message_uploads` now marks the message `published`; `anytext_list_messages` and signed download target lookup only expose published messages.
+- Realtime refresh now uses the authoritative published list instead of immediately rendering raw table payloads that can omit attachment metadata.
+- Sender attachment rows show `Ready` before `Send` with no progress rail. During upload/publish, the UI uses indeterminate rails rather than fake percentages because the current Supabase browser upload path does not provide exact byte progress.
+- Queue rows now summarize attachments as `1 image`, `2 files`, or `1 image + 1 file`, and copy feedback distinguishes Markdown, code, and command copies.
+- Pairing code display groups the 7-character code visually, for example `126 393 $`, while storing/copying/joining with the raw value `126393$`.
+
+Verification:
+
+- `supabase db push --linked` applied migration `20260625024500_add_message_publish_status.sql` to project `cizmpumlliowigimhwqr`.
+- `npm test` passed with 33 tests after adding coverage for ready attachment state, draft realtime filtering, progress callbacks, copy feedback, and pairing-code normalization.
+- `npm run lint` and `npm run build` passed; build still emits the known non-failing Tabler barrel/chunk-size warning.
+- In-app Browser verification covered page identity, nonblank Command Deck rendering, clean console, and mobile tabs.
+- Headless Chrome/CDP verification covered selected attachment ready state with zero progressbars, cross-tab Markdown+image send, receiver first seeing a published `1 image` item with no `0 attachments`, keyboard Tab order entry, 390px mobile viewport without horizontal overflow, and reduced-motion emulation.
