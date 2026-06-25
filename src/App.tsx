@@ -90,6 +90,7 @@ const BUSY_SEND_STATES = new Set<SendState>(['validating', 'uploading', 'publish
 type QueueStatus = 'idle' | 'loading' | 'error';
 type MobileTab = 'send' | 'queue';
 type SyncStatus = 'connecting' | RealtimeStatus;
+const DELETE_CONFIRMATION_STORAGE_KEY = 'anytext.confirmDeleteMessage';
 
 function App() {
   const [roomKey, setRoomKey] = useState(getInitialRoomKey);
@@ -106,6 +107,9 @@ function App() {
   const [activeTab, setActiveTab] = useState<MobileTab>('send');
   const [imagePreview, setImagePreview] = useState<QueueAttachment | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [deleteConfirmationEnabled, setDeleteConfirmationEnabled] = useState(getInitialDeleteConfirmationEnabled);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
   const [backendError, setBackendError] = useState('');
@@ -213,6 +217,10 @@ function App() {
   const selectedStoredItem = useMemo(
     () => (selectedId ? queueItems.find((item) => item.id === selectedId && !item.deletedAt) ?? null : null),
     [queueItems, selectedId],
+  );
+  const pendingDeleteItem = useMemo(
+    () => (pendingDeleteId ? queueItems.find((item) => item.id === pendingDeleteId && !item.deletedAt) ?? null : null),
+    [pendingDeleteId, queueItems],
   );
   const selectedItem = selectedStoredItem ?? activeItems[0] ?? null;
   const selectedItemExpired = selectedStoredItem ? getItemTimeState(selectedStoredItem.expiresAt, now).expired : false;
@@ -334,14 +342,33 @@ function App() {
     }
   }
 
-  async function deleteMessage(id: string) {
+  function updateDeleteConfirmationPreference(enabled: boolean) {
+    saveDeleteConfirmationEnabled(enabled);
+    setDeleteConfirmationEnabled(enabled);
+  }
+
+  function requestDeleteMessage(id: string) {
+    if (deleteConfirmationEnabled && queueItems.some((item) => item.id === id && !item.deletedAt)) {
+      setPendingDeleteId(id);
+      return;
+    }
+
+    void performDeleteMessage(id);
+  }
+
+  async function performDeleteMessage(id: string) {
+    setDeletingId(id);
+
     try {
       await deleteSupabaseMessage(getSupabaseClient(), roomKey, id);
       setQueueItems((items) => items.filter((item) => item.id !== id));
       setSelectedId(null);
+      setPendingDeleteId(null);
     } catch (error) {
       setQueueStatus('error');
       setBackendError(getErrorMessage(error));
+    } finally {
+      setDeletingId((current) => (current === id ? null : current));
     }
   }
 
@@ -408,10 +435,12 @@ function App() {
   return (
     <div className="min-h-[100dvh] bg-[#070a0c] text-slate-100">
       <TopBar
+        deleteConfirmationEnabled={deleteConfirmationEnabled}
         deviceName={deviceName}
         joinLink={joinLink}
         menuOpen={menuOpen}
         onCopyJoinLink={() => copyMarkdown(joinLink)}
+        onDeleteConfirmationChange={updateDeleteConfirmationPreference}
         onMenuOpenChange={setMenuOpen}
         onRenameDevice={(name) => {
           saveDeviceName(name);
@@ -485,7 +514,7 @@ function App() {
               now={now}
               onCopyMarkdown={copyMarkdown}
               onClearSelection={() => setSelectedId(null)}
-              onDeleteMessage={deleteMessage}
+              onDeleteMessage={requestDeleteMessage}
               onImagePreview={setImagePreview}
               onRefresh={refreshQueue}
               onSelect={setSelectedId}
@@ -498,6 +527,17 @@ function App() {
         </div>
       </main>
 
+      {pendingDeleteItem ? (
+        <DeleteConfirmDialog
+          confirming={deletingId === pendingDeleteItem.id}
+          deleteConfirmationEnabled={deleteConfirmationEnabled}
+          item={pendingDeleteItem}
+          now={now}
+          onCancel={() => setPendingDeleteId(null)}
+          onConfirm={() => void performDeleteMessage(pendingDeleteItem.id)}
+          onPreferenceChange={updateDeleteConfirmationPreference}
+        />
+      ) : null}
       {imagePreview ? <ImagePreviewModal attachment={imagePreview} onClose={() => setImagePreview(null)} /> : null}
     </div>
   );
@@ -563,10 +603,12 @@ function FirstRunScreen({ onCreate, onJoin }: FirstRunScreenProps) {
 }
 
 interface TopBarProps {
+  deleteConfirmationEnabled: boolean;
   deviceName: string;
   joinLink: string;
   menuOpen: boolean;
   onCopyJoinLink: () => void;
+  onDeleteConfirmationChange: (enabled: boolean) => void;
   onMenuOpenChange: (open: boolean) => void;
   onRenameDevice: (name: string) => void;
   onResetBrowser: () => void;
@@ -576,10 +618,12 @@ interface TopBarProps {
 }
 
 function TopBar({
+  deleteConfirmationEnabled,
   deviceName,
   joinLink,
   menuOpen,
   onCopyJoinLink,
+  onDeleteConfirmationChange,
   onMenuOpenChange,
   onRenameDevice,
   onResetBrowser,
@@ -609,7 +653,7 @@ function TopBar({
     }
 
     const focusTimer = window.setTimeout(() => {
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"], input')?.focus();
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], input')?.focus();
     }, 0);
 
     function handlePointerDown(event: PointerEvent) {
@@ -631,7 +675,9 @@ function TopBar({
   }, [closeMenu, menuOpen]);
 
   function handleMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const focusable = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"], input') ?? []);
+    const focusable = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemcheckbox"], input') ?? [],
+    );
     const currentIndex = focusable.findIndex((element) => element === document.activeElement);
 
     if (event.key === 'Escape') {
@@ -760,6 +806,21 @@ function TopBar({
                   <span>Rename device</span>
                 </button>
               )}
+              <button
+                aria-checked={deleteConfirmationEnabled}
+                className="menu-item menu-item-toggle"
+                onClick={() => onDeleteConfirmationChange(!deleteConfirmationEnabled)}
+                role="menuitemcheckbox"
+                type="button"
+              >
+                <span className={cx('menu-toggle-box', deleteConfirmationEnabled && 'menu-toggle-box-active')} aria-hidden>
+                  {deleteConfirmationEnabled ? <IconCheck size={13} stroke={2.4} /> : null}
+                </span>
+                <span className="min-w-0">
+                  <span className="block">Confirm deletions</span>
+                  <span className="menu-item-caption">Ask before removing queue messages</span>
+                </span>
+              </button>
               <div className="my-1 border-t border-white/10" />
               <button className="menu-item menu-item-danger" onClick={onResetBrowser} role="menuitem" type="button">
                 <IconTrash aria-hidden size={16} />
@@ -1482,6 +1543,146 @@ function FileDownloadRow({ attachment, disabled }: { attachment: QueueAttachment
   );
 }
 
+interface DeleteConfirmDialogProps {
+  confirming: boolean;
+  deleteConfirmationEnabled: boolean;
+  item: QueueItem;
+  now: Date;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onPreferenceChange: (enabled: boolean) => void;
+}
+
+function DeleteConfirmDialog({
+  confirming,
+  deleteConfirmationEnabled,
+  item,
+  now,
+  onCancel,
+  onConfirm,
+  onPreferenceChange,
+}: DeleteConfirmDialogProps) {
+  const cancelButtonRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const latestDialogStateRef = useRef({ confirming, onCancel });
+  const title = getQueueItemTitle(item);
+  const attachmentSummary = getAttachmentSummary(item.attachments);
+
+  useEffect(() => {
+    latestDialogStateRef.current = { confirming, onCancel };
+  }, [confirming, onCancel]);
+
+  useEffect(() => {
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const focusTimer = window.setTimeout(() => cancelButtonRef.current?.focus(), 0);
+
+    function handleKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (!latestDialogStateRef.current.confirming) {
+          latestDialogStateRef.current.onCancel();
+        }
+        return;
+      }
+
+      if (event.key !== 'Tab') {
+        return;
+      }
+
+      const focusable = Array.from(
+        dialogRef.current?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled), input:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
+        ) ?? [],
+      );
+
+      if (focusable.length === 0) {
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable.at(-1);
+
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+        return;
+      }
+
+      if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.clearTimeout(focusTimer);
+      document.removeEventListener('keydown', handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, []);
+
+  return (
+    <div className="confirm-backdrop" onClick={() => !confirming && onCancel()} role="presentation">
+      <div
+        aria-describedby="delete-confirm-description"
+        aria-labelledby="delete-confirm-title"
+        aria-modal="true"
+        className="confirm-dialog"
+        onClick={(event) => event.stopPropagation()}
+        ref={dialogRef}
+        role="dialog"
+      >
+        <div className="confirm-header">
+          <div className="confirm-icon">
+            <IconTrash aria-hidden size={19} stroke={1.8} />
+          </div>
+          <div className="min-w-0">
+            <h3 className="text-lg font-semibold tracking-tight" id="delete-confirm-title">
+              Delete this message?
+            </h3>
+            <p className="mt-1 text-sm text-slate-400" id="delete-confirm-description">
+              This removes the relay item from every paired device. It cannot be restored.
+            </p>
+          </div>
+        </div>
+
+        <div className="confirm-summary">
+          <p className="truncate text-sm font-semibold text-slate-100">{title}</p>
+          <p className="mt-1 font-mono text-[11px] text-slate-500">
+            {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
+            {attachmentSummary ? ` · ${attachmentSummary}` : ''}
+          </p>
+        </div>
+
+        <label className="confirm-option">
+          <input
+            checked={deleteConfirmationEnabled}
+            className="confirm-checkbox"
+            onChange={(event) => onPreferenceChange(event.target.checked)}
+            type="checkbox"
+          />
+          <span className="min-w-0">
+            <span className="block text-sm font-medium text-slate-100">Ask before deleting messages</span>
+            <span className="block text-xs text-slate-500">Turn this off when you want queue deletes to run immediately.</span>
+          </span>
+        </label>
+
+        <div className="confirm-actions">
+          <button className="secondary-button" disabled={confirming} onClick={onCancel} ref={cancelButtonRef} type="button">
+            Cancel
+          </button>
+          <button className="danger-button danger-button-strong" disabled={confirming} onClick={onConfirm} type="button">
+            {confirming ? <IconLoader2 aria-hidden className="motion-safe:animate-spin" size={15} /> : <IconTrash aria-hidden size={15} />}
+            {confirming ? 'Deleting' : 'Delete message'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachment; onClose: () => void }) {
   const [previewFailed, setPreviewFailed] = useState(false);
   const canShowPreview = Boolean(attachment.objectUrl) && !previewFailed;
@@ -1647,6 +1848,22 @@ function syncStatusLabel(status: SyncStatus): string {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Supabase relay request failed.';
+}
+
+function getInitialDeleteConfirmationEnabled(): boolean {
+  try {
+    return globalThis.localStorage?.getItem(DELETE_CONFIRMATION_STORAGE_KEY) !== 'false';
+  } catch {
+    return true;
+  }
+}
+
+function saveDeleteConfirmationEnabled(enabled: boolean) {
+  try {
+    globalThis.localStorage?.setItem(DELETE_CONFIRMATION_STORAGE_KEY, enabled ? 'true' : 'false');
+  } catch {
+    // Preference storage is best-effort; deletion safety still defaults to confirmation.
+  }
 }
 
 function createLocalId(): string {

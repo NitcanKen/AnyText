@@ -139,11 +139,53 @@ describe('AnyText Command Deck app', () => {
 
     await user.click(screen.getByRole('button', { name: /delete message/i }));
 
+    const confirmDialog = await screen.findByRole('dialog', { name: /delete this message/i });
+    expect(relayMocks.deleteMessage).not.toHaveBeenCalled();
+    const deletePreference = within(confirmDialog).getByRole('checkbox', { name: /ask before deleting messages/i });
+    expect(deletePreference).toBeChecked();
+
+    await user.click(deletePreference);
+    expect(localStorage.getItem('anytext.confirmDeleteMessage')).toBe('false');
+    await user.click(within(confirmDialog).getByRole('button', { name: /delete message/i }));
     expect(relayMocks.deleteMessage).toHaveBeenCalledWith(supabaseClientMock, 'test-room-key', 'message-1');
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /ship this/i })).not.toBeInTheDocument();
     });
     expect(screen.getByText('No items in the last hour.')).toBeInTheDocument();
+  });
+
+  it('lets users disable delete confirmation from the room menu', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('anytext.roomKey', 'test-room-key');
+    relayMocks.listMessages.mockResolvedValueOnce([
+      {
+        id: 'menu-delete',
+        markdown: '# Quick note',
+        attachments: [],
+        senderDeviceName: 'MacBook',
+        createdAt: '2099-06-24T12:00:00.000Z',
+        expiresAt: '2099-06-24T13:00:00.000Z',
+      },
+    ]);
+
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: /quick note/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /open room menu/i }));
+
+    const toggle = await screen.findByRole('menuitemcheckbox', { name: /confirm deletions/i });
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    await user.click(toggle);
+
+    expect(localStorage.getItem('anytext.confirmDeleteMessage')).toBe('false');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+
+    await user.click(screen.getByRole('button', { name: /delete queue item/i }));
+
+    expect(screen.queryByRole('dialog', { name: /delete this message/i })).not.toBeInTheDocument();
+    expect(relayMocks.deleteMessage).toHaveBeenCalledWith(supabaseClientMock, 'test-room-key', 'menu-delete');
   });
 
   it('selects multiple attachments, sends them with Markdown, previews images, and downloads files', async () => {

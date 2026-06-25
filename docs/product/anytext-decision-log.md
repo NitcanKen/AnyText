@@ -303,3 +303,19 @@ Verification:
 - `npm run lint` and `npm run build` passed; build still emits the known non-failing Tabler barrel/chunk-size warning.
 - In-app Browser verification covered page identity, nonblank Command Deck rendering, clean console, and mobile tabs.
 - Headless Chrome/CDP verification covered selected attachment ready state with zero progressbars, cross-tab Markdown+image send, receiver first seeing a published `1 image` item with no `0 attachments`, keyboard Tab order entry, 390px mobile viewport without horizontal overflow, and reduced-motion emulation.
+
+## Implementation Note: Delete Confirmation Preference
+
+Implemented on 2026-06-25:
+
+- Replaced immediate message deletion with a confirmation dialog when local delete confirmation is enabled.
+- Added a dialog checkbox, `Ask before deleting messages`, that persists the preference in this browser through `localStorage`.
+- Added the same setting to the room menu as `Confirm deletions`, so users can control the behavior without needing to start a delete action.
+- Kept the preference local to the current browser. No Supabase schema, RPC, Storage, or realtime contract changed.
+- Designed the dialog as a Command Deck-native destructive action guard: dark compact panel, safe default focus on `Cancel`, explicit irreversible-action copy, mobile stacked actions, Escape close, click-outside close when idle, and Tab focus loop.
+
+Verification:
+
+- `npm test` passed with 34 tests, including modal confirmation and room-menu setting coverage.
+- `npm run lint` and `npm run build` passed; build still emits the known non-failing Tabler barrel/chunk-size warning.
+- In-app Browser verification covered desktop page identity, nonblank Command Deck rendering, clean console, delete confirmation modal, modal checkbox toggle, confirmed delete, room-menu setting sync, direct delete when confirmation is disabled, 390px mobile viewport without horizontal overflow, mobile detail-sheet delete modal, modal viewport fit, and loaded reduced-motion CSS override.
