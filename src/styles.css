@@ -44,6 +44,50 @@ a:focus-visible {
 }
 
 @layer components {
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .topbar-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: min(calc(100vw - 24px), 2200px);
+    height: 3.5rem;
+    margin-inline: auto;
+  }
+
+  .workspace-shell {
+    display: flex;
+    width: min(calc(100vw - 24px), 2200px);
+    min-height: 0;
+    margin-inline: auto;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .workspace-grid {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+  }
+
+  .workspace-pane {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .workspace-panel {
+    display: flex;
+    min-height: calc(100dvh - 7.25rem);
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .panel {
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -86,6 +130,7 @@ a:focus-visible {
   }
 
   .editor {
+    width: 100%;
     min-height: 260px;
     flex: 1;
     resize: none;
@@ -126,6 +171,40 @@ a:focus-visible {
     opacity: 0.78;
   }
 
+  .composer-panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.028), transparent 9rem),
+      rgba(16, 21, 24, 0.96);
+  }
+
+  .composer-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    padding: 0.75rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .composer-command-bar {
+    display: flex;
+    max-height: min(44dvh, 23rem);
+    flex-shrink: 0;
+    flex-direction: column;
+    gap: 0.75rem;
+    overflow-y: auto;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      linear-gradient(180deg, rgba(16, 21, 24, 0.98), rgba(12, 17, 20, 0.98)),
+      rgba(16, 21, 24, 0.98);
+    padding: 0.75rem;
+    box-shadow: 0 -18px 36px rgba(0, 0, 0, 0.18);
+  }
+
+  .composer-send-area {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 0.75rem;
+  }
+
   .attachment-row {
     display: flex;
     align-items: center;
@@ -135,6 +214,7 @@ a:focus-visible {
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.035);
     padding: 0.625rem;
+    animation: attachment-row-in 160ms ease both;
   }
 
   .attachment-progress-slot {
@@ -505,6 +585,47 @@ a:focus-visible {
     animation: queue-in 180ms ease both;
   }
 
+  .queue-panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.022), transparent 8rem),
+      rgba(16, 21, 24, 0.96);
+  }
+
+  .queue-layout {
+    display: grid;
+    min-height: 0;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .queue-list-pane {
+    min-height: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .queue-list-scroll {
+    max-height: 34dvh;
+    overflow-y: auto;
+    padding: 0.5rem;
+  }
+
+  .detail-pane {
+    display: none;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .empty-detail-state {
+    display: flex;
+    min-height: 100%;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    color: #64748b;
+    text-align: center;
+    font-size: 0.875rem;
+  }
+
   .queue-row {
     width: 100%;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -669,20 +790,208 @@ a:focus-visible {
     inset: 0;
     z-index: 35;
     display: flex;
-    align-items: flex-end;
-    background: rgba(0, 0, 0, 0.62);
+    align-items: stretch;
+    background: rgba(0, 0, 0, 0.72);
   }
 
   .mobile-detail-sheet {
+    display: flex;
+    flex-direction: column;
     width: 100%;
-    max-height: 88dvh;
-    overflow-y: auto;
+    height: 100dvh;
+    max-height: none;
+    overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-bottom: 0;
-    border-radius: 8px 8px 0 0;
+    border-radius: 0;
     background: #101518;
     box-shadow: 0 -24px 90px rgba(0, 0, 0, 0.48);
     animation: sheet-in 180ms ease both;
+  }
+
+  .message-detail {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .detail-toolbar {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 0.875rem;
+  }
+
+  .detail-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem;
+  }
+
+  .message-detail-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .detail-main-scroll {
+    min-height: 0;
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.875rem;
+    scroll-behavior: smooth;
+  }
+
+  .detail-main-inner {
+    max-width: 84ch;
+  }
+
+  .detail-attachment-dock {
+    min-height: 0;
+    flex-shrink: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      linear-gradient(180deg, rgba(190, 252, 60, 0.035), transparent),
+      rgba(255, 255, 255, 0.018);
+    padding: 0.875rem;
+    outline: none;
+  }
+
+  .detail-attachment-dock:focus {
+    border-color: rgba(190, 252, 60, 0.42);
+    box-shadow: inset 0 0 0 1px rgba(190, 252, 60, 0.24);
+  }
+
+  .attachment-dock-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .attachment-dock-grid {
+    gap: 0.625rem;
+  }
+
+  @media (min-width: 768px) {
+    .app-shell {
+      display: flex;
+      height: 100dvh;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .topbar-inner,
+    .workspace-shell {
+      width: min(calc(100vw - 32px), 2200px);
+    }
+
+    .workspace-shell {
+      flex: 1;
+      padding-bottom: 1rem;
+    }
+
+    .workspace-grid {
+      grid-template-columns: minmax(360px, 0.42fr) minmax(0, 0.58fr);
+      gap: 1rem;
+    }
+
+    .workspace-panel {
+      height: 100%;
+      min-height: 0;
+    }
+
+    .composer-command-bar {
+      max-height: min(38dvh, 22rem);
+    }
+
+    .queue-layout {
+      grid-template-columns: minmax(240px, 30%) minmax(0, 1fr);
+    }
+
+    .queue-list-pane {
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 0;
+    }
+
+    .queue-list-scroll {
+      height: 100%;
+      max-height: none;
+    }
+
+    .detail-pane {
+      display: block;
+    }
+
+    .mobile-detail-backdrop {
+      display: none;
+    }
+  }
+
+  @media (min-width: 1200px) {
+    .workspace-grid {
+      grid-template-columns: clamp(440px, 34vw, 620px) minmax(0, 1fr);
+    }
+
+    .queue-layout {
+      grid-template-columns: clamp(260px, 18vw, 330px) minmax(0, 1fr);
+    }
+  }
+
+  @media (min-width: 1700px) {
+    .workspace-grid {
+      grid-template-columns: clamp(500px, 34vw, 680px) minmax(0, 1fr);
+    }
+
+    .queue-layout {
+      grid-template-columns: clamp(270px, 16vw, 320px) minmax(620px, 1fr);
+    }
+
+    .message-detail-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) clamp(240px, 16vw, 300px);
+    }
+
+    .detail-main-scroll {
+      grid-column: 1;
+      grid-row: 1;
+      padding: 1rem;
+    }
+
+    .detail-attachment-dock {
+      grid-column: 2;
+      grid-row: 1;
+      overflow-y: auto;
+      border-bottom: 0;
+      border-left: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .attachment-dock-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .attachment-dock-grid .attachment-card {
+      grid-template-columns: 4.25rem minmax(0, 1fr);
+    }
+
+    .attachment-dock-grid .attachment-preview {
+      width: 4.25rem;
+      height: 3.5rem;
+    }
+
+    .attachment-dock-grid .file-row .secondary-button {
+      grid-column: 1 / -1;
+      justify-self: stretch;
+      justify-content: center;
+    }
   }
 }
 
@@ -805,14 +1114,24 @@ a:focus-visible {
   }
 }
 
-@keyframes sheet-in {
+@keyframes attachment-row-in {
   from {
     opacity: 0;
-    transform: translateY(18px);
+    transform: translateY(4px);
   }
 
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(18px);
+  }
+
+  to {
     transform: translateY(0);
   }
 }

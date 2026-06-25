@@ -433,7 +433,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#070a0c] text-slate-100">
+    <div className="app-shell bg-[#070a0c] text-slate-100">
       <TopBar
         deleteConfirmationEnabled={deleteConfirmationEnabled}
         deviceName={deviceName}
@@ -452,7 +452,7 @@ function App() {
         syncStatus={syncStatus}
       />
 
-      <main className="mx-auto flex w-full max-w-[1480px] flex-1 flex-col gap-3 px-3 pb-3 md:px-4 md:pb-4">
+      <main className="workspace-shell">
         <div className="mobile-tabs md:hidden" role="tablist" aria-label="Command Deck sections">
           <button
             aria-label="Open Send tab"
@@ -486,8 +486,8 @@ function App() {
           />
         ) : null}
 
-        <div className="grid min-h-[calc(100dvh-116px)] grid-cols-1 gap-3 md:grid-cols-[minmax(360px,0.42fr)_minmax(0,0.58fr)] md:gap-4">
-          <section className={cx('space-y-3 md:block', activeTab === 'send' ? 'block' : 'hidden md:block')}>
+        <div className="workspace-grid">
+          <section className={cx('workspace-pane md:block', activeTab === 'send' ? 'block' : 'hidden md:block')}>
             <Composer
               attachmentErrors={attachmentErrors}
               attachments={attachments}
@@ -507,7 +507,7 @@ function App() {
             />
           </section>
 
-          <section className={cx('min-h-0 md:block', activeTab === 'queue' ? 'block' : 'hidden md:block')}>
+          <section className={cx('workspace-pane md:block', activeTab === 'queue' ? 'block' : 'hidden md:block')}>
             <QueuePanel
               activeItems={activeItems}
               backendError={backendError}
@@ -708,7 +708,7 @@ function TopBar({
 
   return (
     <header className="sticky top-0 z-20 border-b border-white/10 bg-[#070a0c]/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1480px] items-center justify-between gap-3 px-3 md:px-4">
+      <div className="topbar-inner">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-8 w-8 items-center justify-center rounded border border-lime-300/30 bg-lime-300/10 font-mono text-sm font-bold text-lime-200">
             AT
@@ -928,7 +928,7 @@ function Composer({
   }
 
   return (
-    <section className="panel flex min-h-[calc(100dvh-160px)] flex-col overflow-hidden">
+    <section className="panel workspace-panel composer-panel">
       <div className="panel-header">
         <div>
           <p className="label">Compose</p>
@@ -940,7 +940,7 @@ function Composer({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
+      <div className="composer-body">
         <label className="sr-only" htmlFor="markdown-input">
           Markdown input
         </label>
@@ -958,7 +958,9 @@ function Composer({
           placeholder="Paste Markdown, code, commands..."
           value={markdown}
         />
+      </div>
 
+      <div className="composer-command-bar" aria-label="Composer actions">
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
           <span className={cx(!markdownValidation.valid && 'text-amber-300')}>
             {formatBytes(markdownValidation.bytes)} / {formatBytes(MARKDOWN_LIMIT_BYTES)}
@@ -1006,7 +1008,7 @@ function Composer({
 
         <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
 
-        <div className="mt-auto border-t border-white/10 pt-3">
+        <div className="composer-send-area">
           <SendProgress sendState={sendState} attachmentCount={attachments.length} />
           {sendState === 'failed' ? <InlineAlert message={backendError || 'Send failed. Retry after refreshing sync.'} /> : null}
           <button className="send-button" disabled={sendDisabled} onClick={onSend} type="button">
@@ -1211,7 +1213,7 @@ function QueuePanel({
   }
 
   return (
-    <section className="panel flex min-h-[calc(100dvh-160px)] flex-col overflow-hidden">
+    <section className="panel workspace-panel queue-panel">
       <div className="panel-header">
         <div>
           <p className="label">Queue</p>
@@ -1239,13 +1241,13 @@ function QueuePanel({
         </div>
       ) : null}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[260px_1fr]">
-        <div className="min-h-0 border-b border-white/10 md:border-b-0 md:border-r">
+      <div className="queue-layout">
+        <div className="queue-list-pane">
           {queueStatus === 'loading' ? <QueueSkeleton /> : null}
           {queueStatus === 'error' ? <QueueError onRefresh={onRefresh} /> : null}
           {queueStatus === 'idle' && activeItems.length === 0 ? <EmptyQueue /> : null}
           {queueStatus === 'idle' && activeItems.length > 0 ? (
-            <div className="max-h-[34dvh] overflow-y-auto p-2 md:max-h-none">
+            <div className="queue-list-scroll">
               {activeItems.map((item) => (
                 <QueueRow
                   item={item}
@@ -1260,7 +1262,7 @@ function QueuePanel({
           ) : null}
         </div>
 
-        <div className="hidden min-h-0 overflow-y-auto md:block">
+        <div className="detail-pane">
           {selectedItem ? (
             <MessageDetail
               expired={selectedItemExpired}
@@ -1271,7 +1273,7 @@ function QueuePanel({
               onImagePreview={onImagePreview}
             />
           ) : (
-            <div className="flex min-h-full items-center justify-center p-8 text-center text-sm text-slate-500">
+            <div className="empty-detail-state">
               Select a queue item to inspect Markdown, copy commands, or download files.
             </div>
           )}
@@ -1411,6 +1413,8 @@ interface MessageDetailProps {
 
 function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, onDeleteMessage, onImagePreview }: MessageDetailProps) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const attachmentDockRef = useRef<HTMLDivElement | null>(null);
+  const attachmentDockId = `attachments-${item.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const timeState = getItemTimeState(item.expiresAt, now);
   const isExpired = expired || timeState.expired;
 
@@ -1425,9 +1429,19 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
     }
   }
 
+  function focusAttachmentDock() {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
+    attachmentDockRef.current?.scrollIntoView?.({
+      behavior: reduceMotion ? 'auto' : 'smooth',
+      block: 'nearest',
+    });
+    attachmentDockRef.current?.focus({ preventScroll: true });
+  }
+
   return (
-    <article className="p-3 md:p-4">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <article className="message-detail">
+      <div className="detail-toolbar">
         <div>
           <p className="label">Detail</p>
           <h3 className="text-base font-semibold text-slate-100">{getQueueItemTitle(item)}</h3>
@@ -1435,7 +1449,18 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
             {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="detail-actions">
+          {item.attachments.length > 0 ? (
+            <button
+              aria-controls={attachmentDockId}
+              className="secondary-button"
+              onClick={focusAttachmentDock}
+              type="button"
+            >
+              <IconPaperclip aria-hidden size={15} />
+              {item.attachments.length === 1 ? '1 attachment' : `${item.attachments.length} attachments`}
+            </button>
+          ) : null}
           <button className="secondary-button" onClick={copyMarkdown} type="button">
             {copyState === 'copied' ? <IconCheck aria-hidden size={15} /> : <IconCopy aria-hidden size={15} />}
             {copyState === 'copied' ? 'Markdown copied' : copyState === 'failed' ? 'Copy failed' : 'Copy Markdown'}
@@ -1452,25 +1477,64 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
         </div>
       </div>
 
-      {isExpired ? <InlineAlert message="Message expired. It is hidden from the queue and downloads are disabled." /> : null}
+      <div className={cx('message-detail-body', item.attachments.length === 0 && 'message-detail-body-empty')}>
+        {item.attachments.length > 0 ? (
+          <AttachmentDock
+            attachments={item.attachments}
+            disabled={isExpired}
+            dockId={attachmentDockId}
+            dockRef={attachmentDockRef}
+            onImagePreview={onImagePreview}
+          />
+        ) : null}
 
-      {item.markdown ? <MarkdownPreview markdown={item.markdown} /> : null}
-
-      {item.attachments.length > 0 ? (
-        <div className="mt-5 space-y-3">
-          <h4 className="text-sm font-semibold">Attachments</h4>
-          <div className="attachment-grid">
-            {item.attachments.map((attachment) =>
-              attachment.previewKind === 'image' ? (
-                <ImageAttachment disabled={isExpired} key={attachment.id} attachment={attachment} onPreview={onImagePreview} />
-              ) : (
-                <FileDownloadRow attachment={attachment} disabled={isExpired} key={attachment.id} />
-              ),
-            )}
+        <div className="detail-main-scroll">
+          <div className="detail-main-inner">
+            {isExpired ? <InlineAlert message="Message expired. It is hidden from the queue and downloads are disabled." /> : null}
+            {item.markdown ? <MarkdownPreview markdown={item.markdown} /> : null}
           </div>
         </div>
-      ) : null}
+      </div>
     </article>
+  );
+}
+
+interface AttachmentDockProps {
+  attachments: QueueAttachment[];
+  disabled: boolean;
+  dockId: string;
+  dockRef: RefObject<HTMLDivElement | null>;
+  onImagePreview: (attachment: QueueAttachment) => void;
+}
+
+function AttachmentDock({ attachments, disabled, dockId, dockRef, onImagePreview }: AttachmentDockProps) {
+  return (
+    <section
+      aria-label="Message attachments"
+      className="detail-attachment-dock"
+      id={dockId}
+      ref={dockRef}
+      tabIndex={-1}
+    >
+      <div className="attachment-dock-header">
+        <div>
+          <p className="label">Attachments</p>
+          <h4 className="text-sm font-semibold text-slate-100">
+            {attachments.length === 1 ? '1 attachment' : `${attachments.length} attachments`}
+          </h4>
+        </div>
+        <p className="font-mono text-[11px] text-slate-500">{getAttachmentSummary(attachments)}</p>
+      </div>
+      <div className="attachment-grid attachment-dock-grid">
+        {attachments.map((attachment) =>
+          attachment.previewKind === 'image' ? (
+            <ImageAttachment disabled={disabled} key={attachment.id} attachment={attachment} onPreview={onImagePreview} />
+          ) : (
+            <FileDownloadRow attachment={attachment} disabled={disabled} key={attachment.id} />
+          ),
+        )}
+      </div>
+    </section>
   );
 }
 

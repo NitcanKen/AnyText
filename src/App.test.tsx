@@ -236,7 +236,12 @@ describe('AnyText Command Deck app', () => {
 
     await user.click(screen.getByRole('button', { name: /send 2 files/i }));
 
-    await screen.findByRole('button', { name: /attachments/i });
+    const attachmentJump = await screen.findByRole('button', { name: /2 attachments/i });
+    const attachmentDock = screen.getByLabelText('Message attachments');
+    expect(attachmentJump).toHaveAttribute('aria-controls', 'attachments-message-with-files');
+    expect(attachmentDock).toBeInTheDocument();
+    await user.click(attachmentJump);
+    expect(attachmentDock).toHaveFocus();
     expect(relayMocks.createMessage).toHaveBeenCalledWith(
       supabaseClientMock,
       'test-room-key',

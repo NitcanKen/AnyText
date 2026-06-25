@@ -319,3 +319,20 @@ Verification:
 - `npm test` passed with 34 tests, including modal confirmation and room-menu setting coverage.
 - `npm run lint` and `npm run build` passed; build still emits the known non-failing Tabler barrel/chunk-size warning.
 - In-app Browser verification covered desktop page identity, nonblank Command Deck rendering, clean console, delete confirmation modal, modal checkbox toggle, confirmed delete, room-menu setting sync, direct delete when confirmation is disabled, 390px mobile viewport without horizontal overflow, mobile detail-sheet delete modal, modal viewport fit, and loaded reduced-motion CSS override.
+
+## Implementation Note: Workspace Layout and Attachment Reachability
+
+Implemented on 2026-06-25:
+
+- Replaced the fixed centered Command Deck shell with viewport-based workspace sizing shared by the top bar and main deck.
+- Split the composer into a scrollable editor region and a persistent command bar, so long Markdown drafts do not push attachment controls or `Send` out of reach.
+- Reworked Queue internals so the queue list and message detail have their own scroll boundaries on desktop.
+- Added a message attachment dock above Markdown on constrained layouts and as a right-side rail on wide layouts, with a detail-toolbar attachment count jump control.
+- Made the mobile detail view a full-screen opaque sheet with internal detail scrolling, keeping actions and attachments reachable before long Markdown content.
+- Raised the workspace shell cap from the original `1920px` planning suggestion to `2200px` so a `2048px` display keeps `16px` safe gutters instead of wasting `64px` on both sides.
+
+Verification:
+
+- `npm run lint`, `npm test`, and `npm run build` passed; build still emits the known non-failing Tabler barrel/chunk-size warning.
+- In-app Browser verification covered page identity, nonblank Command Deck rendering, clean console, long Markdown editor internal scrolling, visible command bar and Send button, and no desktop body scroll.
+- Bundled Playwright verification covered `1440x900`, `1728x1117`, `2048x1152`, and `390x844`; long Markdown plus image/PDF upload; attachment dock and wide rail; mobile full-screen detail sheet; keyboard Tab order; reduced-motion emulation; no horizontal overflow; and no ready-state progress bars.
