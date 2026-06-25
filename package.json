@@ -1,7 +1,7 @@
 {
   "name": "anytext",
   "version": "0.1.0",
-  "description": "AnyText Command Deck frontend",
+  "description": "Temporary Markdown and file relay for your own devices.",
   "private": true,
   "homepage": "https://nitcanken.github.io/AnyText/",
   "scripts": {
@@ -15,9 +15,16 @@
     "type": "git",
     "url": "git+https://github.com/NitcanKen/AnyText.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "UNLICENSED",
+  "keywords": [
+    "markdown",
+    "file-transfer",
+    "supabase",
+    "react",
+    "vite",
+    "cross-device"
+  ],
+  "author": "Ken",
+  "license": "MIT",
   "type": "module",
   "bugs": {
     "url": "https://github.com/NitcanKen/AnyText/issues"
