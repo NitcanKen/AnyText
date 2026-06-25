@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText MVP status</title>
+  <desc id="desc">A status board showing implemented MVP capabilities and explicit non-goals.</desc>
+  <rect width="1200" height="360" rx="24" fill="#070a0c"/>
+  <text x="48" y="60" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">CURRENT STATUS</text>
+  <text x="48" y="100" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="800">MVP relay is live; product boundaries stay tight</text>
+  <g font-family="Inter, Arial, sans-serif" font-size="20">
+    <rect x="48" y="142" width="520" height="154" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="78" y="184" fill="#befc3c" font-weight="800">Implemented</text>
+    <text x="78" y="222" fill="#f8fafc">Markdown preview, code copy, attachments</text>
+    <text x="78" y="256" fill="#f8fafc">Supabase realtime, signed URLs, cleanup</text>
+    <rect x="632" y="142" width="520" height="154" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="662" y="184" fill="#f87171" font-weight="800">Not in MVP</text>
+    <text x="662" y="222" fill="#f8fafc">Accounts, teams, search, tags, native apps</text>
+    <text x="662" y="256" fill="#f8fafc">Public sharing, clipboard watcher, E2E encryption</text>
+  </g>
+  <line x1="596" y1="144" x2="596" y2="296" stroke="#befc3c" stroke-width="2" stroke-dasharray="8 10"/>
+</svg>

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText tech stack</title>
+  <desc id="desc">A stack map showing frontend, rendering, backend, hosting, and tests.</desc>
+  <rect width="1200" height="360" rx="24" fill="#070a0c"/>
+  <text x="48" y="62" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">TECH STACK</text>
+  <g font-family="Inter, Arial, sans-serif" text-anchor="middle">
+    <rect x="58" y="126" width="200" height="112" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="158" y="174" fill="#f8fafc" font-size="24" font-weight="800">Frontend</text>
+    <text x="158" y="206" fill="#8da2bf" font-size="16">Vite, React, TS</text>
+    <rect x="286" y="126" width="200" height="112" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="386" y="174" fill="#f8fafc" font-size="24" font-weight="800">UI</text>
+    <text x="386" y="206" fill="#8da2bf" font-size="16">Tailwind, Tabler</text>
+    <rect x="514" y="126" width="200" height="112" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="614" y="174" fill="#f8fafc" font-size="24" font-weight="800">Markdown</text>
+    <text x="614" y="206" fill="#8da2bf" font-size="16">GFM, sanitize, Prism</text>
+    <rect x="742" y="126" width="200" height="112" rx="18" fill="#1d2a18" stroke="#86bf1f"/>
+    <text x="842" y="174" fill="#befc3c" font-size="24" font-weight="800">Backend</text>
+    <text x="842" y="206" fill="#d9f99d" font-size="16">Supabase</text>
+    <rect x="970" y="126" width="172" height="112" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="1056" y="174" fill="#f8fafc" font-size="24" font-weight="800">Quality</text>
+    <text x="1056" y="206" fill="#8da2bf" font-size="16">Vitest, ESLint</text>
+  </g>
+  <text x="600" y="294" fill="#8da2bf" font-family="Inter, Arial, sans-serif" font-size="19" text-anchor="middle">A static browser app with a narrow Supabase data boundary.</text>
+</svg>

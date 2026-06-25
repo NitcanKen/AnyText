@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="400" viewBox="0 0 1200 400" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText Supabase setup</title>
+  <desc id="desc">Supabase setup flow: link project, push database, deploy edge functions, set cleanup token.</desc>
+  <rect width="1200" height="400" rx="24" fill="#070a0c"/>
+  <text x="48" y="62" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">SUPABASE SETUP</text>
+  <defs><marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto"><path d="M2 2l8 4-8 4z" fill="#befc3c"/></marker></defs>
+  <g font-family="Inter, Arial, sans-serif" text-anchor="middle">
+    <rect x="70" y="140" width="230" height="124" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="185" y="190" fill="#f8fafc" font-size="23" font-weight="800">Link project</text>
+    <text x="185" y="222" fill="#8da2bf" font-size="16">supabase link</text>
+    <path d="M318 202H404" stroke="#befc3c" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="420" y="140" width="230" height="124" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="535" y="190" fill="#f8fafc" font-size="23" font-weight="800">Push DB</text>
+    <text x="535" y="222" fill="#8da2bf" font-size="16">migrations + RPC</text>
+    <path d="M668 202H754" stroke="#befc3c" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="770" y="140" width="230" height="124" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="885" y="190" fill="#f8fafc" font-size="23" font-weight="800">Deploy functions</text>
+    <text x="885" y="222" fill="#8da2bf" font-size="16">download + cleanup</text>
+    <path d="M1018 202H1068" stroke="#befc3c" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="1084" y="140" width="72" height="124" rx="18" fill="#1d2a18" stroke="#86bf1f"/>
+    <text x="1120" y="190" fill="#befc3c" font-size="23" font-weight="800">Key</text>
+    <text x="1120" y="222" fill="#d9f99d" font-size="14">secret</text>
+  </g>
+  <text x="600" y="322" fill="#8da2bf" font-family="Inter, Arial, sans-serif" font-size="18" text-anchor="middle">Keep service role keys server-side only. The browser receives only VITE_SUPABASE_URL and anon key.</text>
+</svg>

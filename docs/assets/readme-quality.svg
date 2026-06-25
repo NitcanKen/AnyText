@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText quality gates</title>
+  <desc id="desc">Quality gates show lint, tests, build, and browser smoke checks.</desc>
+  <rect width="1200" height="340" rx="24" fill="#070a0c"/>
+  <text x="48" y="62" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">QUALITY GATES</text>
+  <g font-family="Inter, Arial, sans-serif" text-anchor="middle">
+    <rect x="88" y="126" width="220" height="110" rx="18" fill="#1d2a18" stroke="#86bf1f"/>
+    <text x="198" y="172" fill="#befc3c" font-size="42" font-weight="900">✓</text>
+    <text x="198" y="210" fill="#f8fafc" font-size="22" font-weight="800">ESLint</text>
+    <rect x="356" y="126" width="220" height="110" rx="18" fill="#1d2a18" stroke="#86bf1f"/>
+    <text x="466" y="172" fill="#befc3c" font-size="42" font-weight="900">✓</text>
+    <text x="466" y="210" fill="#f8fafc" font-size="22" font-weight="800">Vitest</text>
+    <rect x="624" y="126" width="220" height="110" rx="18" fill="#1d2a18" stroke="#86bf1f"/>
+    <text x="734" y="172" fill="#befc3c" font-size="42" font-weight="900">✓</text>
+    <text x="734" y="210" fill="#f8fafc" font-size="22" font-weight="800">Build</text>
+    <rect x="892" y="126" width="220" height="110" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="1002" y="172" fill="#8da2bf" font-size="42" font-weight="900">↗</text>
+    <text x="1002" y="210" fill="#f8fafc" font-size="22" font-weight="800">Smoke</text>
+  </g>
+  <text x="600" y="288" fill="#8da2bf" font-family="Inter, Arial, sans-serif" font-size="18" text-anchor="middle">No completion claim without fresh lint, tests, and production build.</text>
+</svg>

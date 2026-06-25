@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText security boundary</title>
+  <desc id="desc">A boundary diagram explaining room key, sha256 room id, one hour expiry, and not end-to-end encrypted.</desc>
+  <rect width="1200" height="380" rx="24" fill="#070a0c"/>
+  <text x="48" y="62" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">SECURITY MODEL</text>
+  <g font-family="Inter, Arial, sans-serif">
+    <rect x="50" y="108" width="310" height="190" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="80" y="152" fill="#f8fafc" font-size="24" font-weight="800">Room secret</text>
+    <text x="80" y="190" fill="#befc3c" font-size="34" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-weight="800">123456!</text>
+    <text x="80" y="228" fill="#8da2bf" font-size="17">Stored in paired browsers</text>
+    <text x="80" y="258" fill="#8da2bf" font-size="17">Used for low-friction pairing</text>
+    <rect x="445" y="108" width="310" height="190" rx="18" fill="#101518" stroke="#344049"/>
+    <text x="475" y="152" fill="#f8fafc" font-size="24" font-weight="800">Backend id</text>
+    <text x="475" y="190" fill="#befc3c" font-size="24" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-weight="800">sha256(roomKey)</text>
+    <text x="475" y="228" fill="#8da2bf" font-size="17">Raw key is not stored in Postgres</text>
+    <text x="475" y="258" fill="#8da2bf" font-size="17">Operations stay room-scoped</text>
+    <rect x="840" y="108" width="310" height="190" rx="18" fill="#2a1818" stroke="#7f1d1d"/>
+    <text x="870" y="152" fill="#fecaca" font-size="24" font-weight="800">Limits</text>
+    <text x="870" y="190" fill="#f8fafc" font-size="17">Not end-to-end encrypted</text>
+    <text x="870" y="222" fill="#f8fafc" font-size="17">Not for secrets or long-term storage</text>
+    <text x="870" y="254" fill="#f8fafc" font-size="17">Items expire after 1 hour</text>
+  </g>
+  <path d="M370 203H432M765 203H827" stroke="#befc3c" stroke-width="3" stroke-dasharray="8 8"/>
+</svg>

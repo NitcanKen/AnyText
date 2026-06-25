@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText MIT license</title>
+  <desc id="desc">MIT license visual summary: use, modify, distribute, include copyright notice.</desc>
+  <rect width="1200" height="300" rx="24" fill="#070a0c"/>
+  <text x="48" y="62" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">LICENSE</text>
+  <text x="48" y="116" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="38" font-weight="900">MIT: use, modify, distribute</text>
+  <g font-family="Inter, Arial, sans-serif" text-anchor="middle">
+    <rect x="76" y="160" width="220" height="78" rx="18" fill="#1d2a18" stroke="#86bf1f"/><text x="186" y="208" fill="#befc3c" font-size="23" font-weight="800">Use</text>
+    <rect x="350" y="160" width="220" height="78" rx="18" fill="#1d2a18" stroke="#86bf1f"/><text x="460" y="208" fill="#befc3c" font-size="23" font-weight="800">Modify</text>
+    <rect x="624" y="160" width="220" height="78" rx="18" fill="#1d2a18" stroke="#86bf1f"/><text x="734" y="208" fill="#befc3c" font-size="23" font-weight="800">Distribute</text>
+    <rect x="898" y="160" width="220" height="78" rx="18" fill="#101518" stroke="#344049"/><text x="1008" y="208" fill="#f8fafc" font-size="23" font-weight="800">Keep notice</text>
+  </g>
+</svg>

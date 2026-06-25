@@ -27,6 +27,10 @@ It is not a notes app, team workspace, chat app, public file-sharing service, or
 
 ## What It Does
 
+<p align="center">
+  <img src="docs/assets/readme-flow.svg" alt="AnyText flow: pair once, paste or drop content, send, then copy on another device" width="100%">
+</p>
+
 - Pair owned devices once with a QR link or a 7-character code such as `123456!`.
 - Send Markdown with GitHub-flavored tables, blockquotes, inline code, and highlighted code blocks.
 - Copy the original Markdown or copy an individual code block exactly.
@@ -37,11 +41,19 @@ It is not a notes app, team workspace, chat app, public file-sharing service, or
 
 ## Current Status
 
+<p align="center">
+  <img src="docs/assets/readme-status.svg" alt="AnyText MVP status board showing implemented capabilities and explicit non-goals" width="100%">
+</p>
+
 AnyText is an MVP. The core browser relay is implemented and deployed, including Markdown preview, attachments, Supabase realtime sync, signed downloads, GitHub Pages deployment, and cleanup support.
 
 The project intentionally does not include accounts, collaboration, full-text search, tags, clipboard watching, native apps, browser extensions, public sharing links, or end-to-end encryption.
 
 ## Architecture
+
+<p align="center">
+  <img src="docs/assets/readme-architecture.svg" alt="AnyText architecture: static browser app, restricted Supabase RPC, private Storage, Realtime, and GitHub Pages" width="100%">
+</p>
 
 ```text
 Browser app
@@ -64,6 +76,10 @@ Room records use `sha256(roomKey)` as the backend room id. The raw room key is s
 
 ## Security Model
 
+<p align="center">
+  <img src="docs/assets/readme-security.svg" alt="AnyText security boundary: short room secret, sha256 backend id, and explicit limitations" width="100%">
+</p>
+
 AnyText uses a lightweight shared-secret room model, not an account system.
 
 - New rooms use a short manual pairing code: six digits plus one symbol from `!@#$%^&*`.
@@ -74,6 +90,10 @@ AnyText uses a lightweight shared-secret room model, not an account system.
 - Message rows and attachments are designed around one-hour expiry and manual deletion.
 
 ## Tech Stack
+
+<p align="center">
+  <img src="docs/assets/readme-stack.svg" alt="AnyText tech stack: Vite, React, TypeScript, Tailwind, Markdown libraries, Supabase, Vitest, and ESLint" width="100%">
+</p>
 
 - Vite
 - React
@@ -88,6 +108,10 @@ AnyText uses a lightweight shared-secret room model, not an account system.
 - Vitest and Testing Library
 
 ## Quick Start
+
+<p align="center">
+  <img src="docs/assets/readme-quick-start.svg" alt="AnyText quick start commands: clone, install, run dev server" width="100%">
+</p>
 
 Prerequisites:
 
@@ -114,6 +138,10 @@ Never put a service role key in any `VITE_*` variable. Vite exposes `VITE_*` val
 
 ## Supabase Setup
 
+<p align="center">
+  <img src="docs/assets/readme-supabase.svg" alt="Supabase setup flow: link project, push database, deploy functions, set secrets" width="100%">
+</p>
+
 Install and authenticate the Supabase CLI, then link your project:
 
 ```bash
@@ -139,6 +167,10 @@ supabase secrets set ANYTEXT_CLEANUP_TOKEN="generate-a-long-random-token"
 
 ### Cleanup Schedule
 
+<p align="center">
+  <img src="docs/assets/readme-cleanup.svg" alt="Cleanup schedule flow: find expired records, remove Storage objects, delete metadata, finalize empty messages" width="100%">
+</p>
+
 The cleanup function:
 
 1. Finds expired or deleted attachment records.
@@ -159,6 +191,10 @@ For production, schedule `anytext-cleanup-expired` in Supabase to run every 5 mi
 
 ## GitHub Pages Deployment
 
+<p align="center">
+  <img src="docs/assets/readme-pages.svg" alt="GitHub Pages deployment pipeline: push main, install, lint, test, build, deploy" width="100%">
+</p>
+
 The workflow at `.github/workflows/deploy-pages.yml` runs on `main` and executes:
 
 ```bash
@@ -178,6 +214,10 @@ The default GitHub Pages base path is `/AnyText/`. Override it with `VITE_BASE_P
 
 ## Quality Gates
 
+<p align="center">
+  <img src="docs/assets/readme-quality.svg" alt="AnyText quality gates: ESLint, Vitest, production build, and smoke verification" width="100%">
+</p>
+
 ```bash
 npm run lint
 npm test
@@ -187,6 +227,10 @@ npm run build
 The test suite covers room helpers, pairing links, Markdown sanitization/rendering, code block copy behavior, attachment validation, Supabase relay mapping, queue expiry, and core app flows.
 
 ## Project Structure
+
+<p align="center">
+  <img src="docs/assets/readme-structure.svg" alt="AnyText project structure showing src, supabase, docs, and GitHub workflow folders" width="100%">
+</p>
 
 ```text
 src/
@@ -226,5 +270,9 @@ npm run build
 ```
 
 ## License
+
+<p align="center">
+  <img src="docs/assets/readme-license.svg" alt="MIT license summary: use, modify, distribute, and keep the copyright notice" width="100%">
+</p>
 
 MIT. See [LICENSE](LICENSE).

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText quick start</title>
+  <desc id="desc">A three command quick start flow from clone to npm ci to npm run dev.</desc>
+  <rect width="1200" height="340" rx="24" fill="#070a0c"/>
+  <text x="48" y="62" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">QUICK START</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+    <rect x="70" y="118" width="1060" height="152" rx="18" fill="#020617" stroke="#344049"/>
+    <circle cx="104" cy="148" r="8" fill="#ef4444"/><circle cx="130" cy="148" r="8" fill="#f59e0b"/><circle cx="156" cy="148" r="8" fill="#22c55e"/>
+    <text x="104" y="190" fill="#8da2bf" font-size="20">$ git clone https://github.com/NitcanKen/AnyText.git</text>
+    <text x="104" y="224" fill="#8da2bf" font-size="20">$ npm ci</text>
+    <text x="104" y="258" fill="#befc3c" font-size="20">$ npm run dev</text>
+  </g>
+  <text x="70" y="306" fill="#8da2bf" font-family="Inter, Arial, sans-serif" font-size="17">Copy .env.example to .env.local and add your Supabase URL plus anon key.</text>
+</svg>

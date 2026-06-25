@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+  <title id="title">AnyText project structure</title>
+  <desc id="desc">Folder map for src, supabase, docs, and GitHub workflow.</desc>
+  <rect width="1200" height="420" rx="24" fill="#070a0c"/>
+  <text x="48" y="62" fill="#befc3c" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" font-weight="700" letter-spacing="4">PROJECT STRUCTURE</text>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">
+    <rect x="64" y="110" width="1072" height="238" rx="18" fill="#020617" stroke="#344049"/>
+    <text x="104" y="158" fill="#befc3c">AnyText/</text>
+    <text x="142" y="194" fill="#f8fafc">src/</text><text x="280" y="194" fill="#8da2bf">React app, Markdown preview, helpers, Supabase relay</text>
+    <text x="142" y="230" fill="#f8fafc">supabase/</text><text x="280" y="230" fill="#8da2bf">migrations, RLS, RPC, Edge Functions</text>
+    <text x="142" y="266" fill="#f8fafc">docs/</text><text x="280" y="266" fill="#8da2bf">requirements, design, technical notes, assets</text>
+    <text x="142" y="302" fill="#f8fafc">.github/</text><text x="280" y="302" fill="#8da2bf">GitHub Pages deployment workflow</text>
+  </g>
+</svg>
