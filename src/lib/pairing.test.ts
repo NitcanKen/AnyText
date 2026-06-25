@@ -22,21 +22,21 @@ describe('pairing helpers', () => {
   });
 
   it('stores a room key from the join URL when no browser pairing exists', () => {
-    history.replaceState(null, '', '/AnyText/?room=url-room-key');
+    history.replaceState(null, '', '/AnyText/?room=123456%26');
 
-    expect(getInitialRoomKey()).toBe('url-room-key');
-    expect(localStorage.getItem(ROOM_KEY_STORAGE)).toBe('url-room-key');
+    expect(getInitialRoomKey()).toBe('123456&');
+    expect(localStorage.getItem(ROOM_KEY_STORAGE)).toBe('123456&');
   });
 
-  it('builds shareable join links without storing the raw room key outside local storage', () => {
-    expect(buildJoinLink('secret-room-key', new URL('https://example.com/AnyText/'))).toBe(
-      'https://example.com/AnyText/?room=secret-room-key',
+  it('builds encoded shareable join links without storing the raw room key outside local storage', () => {
+    expect(buildJoinLink('123456#', new URL('https://example.com/AnyText/'))).toBe(
+      'https://example.com/AnyText/?room=123456%23',
     );
 
-    saveRoomKey('secret-room-key');
+    saveRoomKey('123456#');
     saveDeviceName('iPhone');
 
-    expect(localStorage.getItem(ROOM_KEY_STORAGE)).toBe('secret-room-key');
+    expect(localStorage.getItem(ROOM_KEY_STORAGE)).toBe('123456#');
     expect(localStorage.getItem(DEVICE_NAME_STORAGE)).toBe('iPhone');
   });
 });

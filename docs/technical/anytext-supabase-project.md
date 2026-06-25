@@ -114,7 +114,7 @@ Backend implementation should prefer:
 - Functional expiry in all list queries.
 - Physical cleanup for expired/deleted storage objects.
 
-No Supabase Auth should be added for AnyText users. The product's user authorization model remains the high-entropy room key stored in browser `localStorage`.
+No Supabase Auth should be added for AnyText users. The product's user authorization model remains the browser room key stored in `localStorage`. New rooms use a short manual code, and backend records still use only `sha256(roomKey)`.
 
 ## Confirm Before Production
 

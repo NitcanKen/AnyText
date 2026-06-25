@@ -520,7 +520,11 @@ function FirstRunScreen({ onCreate, onJoin }: FirstRunScreenProps) {
                 className="input"
                 id="join-key"
                 onChange={(event) => setJoinKey(event.target.value)}
-                placeholder="Paste room key"
+                autoCapitalize="none"
+                autoCorrect="off"
+                inputMode="text"
+                placeholder="123456!"
+                spellCheck={false}
                 value={joinKey}
               />
               <button className="icon-button px-3" type="submit">
@@ -759,7 +763,7 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink }: PairingC
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold">Pairing QR visible</h2>
-          <p className="mt-1 text-sm text-slate-400">Scan this code or use the manual pairing key on another browser.</p>
+          <p className="mt-1 text-sm text-slate-400">Scan this code or enter the 7-character pairing code.</p>
         </div>
         <button aria-label="Close pairing panel" className="icon-button" onClick={onClose} type="button">
           <IconX aria-hidden size={16} />
@@ -778,8 +782,8 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink }: PairingC
         </div>
         <div className="min-w-0 space-y-3">
           <div>
-            <p className="label">Manual pairing code</p>
-            <code className="mt-1 block truncate rounded border border-white/10 bg-black/25 px-3 py-2 font-mono text-xs text-lime-100">
+            <p className="label">Pairing code</p>
+            <code className="mt-1 block select-all rounded border border-lime-300/20 bg-lime-300/10 px-3 py-2 font-mono text-xl font-semibold text-lime-100">
               {manualCode}
             </code>
           </div>

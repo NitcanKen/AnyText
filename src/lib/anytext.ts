@@ -5,6 +5,9 @@ export const ATTACHMENT_LIMITS = {
   maxFileBytes: 25 * 1024 * 1024,
 } as const;
 
+export const ROOM_KEY_SYMBOLS = '!@#$%^&*';
+export const ROOM_KEY_PATTERN = /^\d{6}[!@#$%^&*]$/;
+
 export type AttachmentPreviewKind = 'image' | 'download';
 
 export interface QueueAttachment {
@@ -38,10 +41,10 @@ export interface QueueItem {
 }
 
 export function generateRoomKey(): string {
-  const bytes = new Uint8Array(16);
-  globalThis.crypto.getRandomValues(bytes);
+  const digits = Array.from({ length: 6 }, () => randomInt(10)).join('');
+  const symbol = ROOM_KEY_SYMBOLS[randomInt(ROOM_KEY_SYMBOLS.length)];
 
-  return base64UrlEncode(bytes);
+  return `${digits}${symbol}`;
 }
 
 export async function hashRoomKey(roomKey: string): Promise<string> {
@@ -180,10 +183,15 @@ export function formatTimeRemaining(expiresAt: string, now = new Date()): string
   return `${hours}h left`;
 }
 
-function base64UrlEncode(bytes: Uint8Array): string {
-  const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+function randomInt(maxExclusive: number): number {
+  const limit = Math.floor(256 / maxExclusive) * maxExclusive;
+  const byte = new Uint8Array(1);
 
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  do {
+    globalThis.crypto.getRandomValues(byte);
+  } while (byte[0] >= limit);
+
+  return byte[0] % maxExclusive;
 }
 
 function createId(): string {

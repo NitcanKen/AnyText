@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ATTACHMENT_LIMITS,
   MARKDOWN_LIMIT_BYTES,
+  ROOM_KEY_PATTERN,
+  ROOM_KEY_SYMBOLS,
   createAttachmentInput,
   classifyAttachment,
   createMockQueueItem,
@@ -18,11 +20,12 @@ import {
 const makeFile = (name: string, size: number, type: string) => new File([new Uint8Array(size)], name, { type });
 
 describe('AnyText room helpers', () => {
-  it('generates a high-entropy url-safe room key', () => {
+  it('generates a short manual pairing room key', () => {
     const key = generateRoomKey();
 
-    expect(key).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(key.length).toBeGreaterThanOrEqual(22);
+    expect(key).toMatch(ROOM_KEY_PATTERN);
+    expect(key).toHaveLength(7);
+    expect(ROOM_KEY_SYMBOLS).toContain(key.at(-1));
   });
 
   it('hashes the raw room key with sha256 hex', async () => {

@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { MARKDOWN_LIMIT_BYTES } from './lib/anytext';
+import { MARKDOWN_LIMIT_BYTES, ROOM_KEY_PATTERN } from './lib/anytext';
 
 const copyTextMock = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 const supabaseClientMock = vi.hoisted(() => ({}));
@@ -70,9 +70,9 @@ describe('AnyText Command Deck app', () => {
 
     await user.click(screen.getByRole('button', { name: /create device circle/i }));
 
-    expect(await screen.findByText(/manual pairing code/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^pairing code$/i)).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /markdown input/i })).toBeInTheDocument();
-    expect(localStorage.getItem('anytext.roomKey')).toBeTruthy();
+    expect(localStorage.getItem('anytext.roomKey')).toMatch(ROOM_KEY_PATTERN);
     await waitFor(() => expect(relayMocks.createRoom).toHaveBeenCalled());
     expect(relayMocks.listMessages).toHaveBeenCalled();
     expect(relayMocks.subscribeToRoomMessages).toHaveBeenCalled();

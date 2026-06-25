@@ -247,7 +247,7 @@ MVP is lightweight secure relay, not end-to-end encrypted storage.
 
 Controls:
 
-- High-entropy room key.
+- Short manual room key: six digits plus one symbol from `!@#$%^&*`.
 - Raw room key not stored in database.
 - 1-hour expiry.
 - Manual delete.
@@ -260,6 +260,7 @@ Known limitations:
 
 - Supabase project administrators can access stored text and files.
 - Anyone with the room key can join the device circle.
+- The short key lowers manual pairing friction but is not suitable for high-sensitivity transfers.
 - If a browser profile is compromised, the room key can be read from `localStorage`.
 - Pairing links should be treated as secret.
 

@@ -270,3 +270,16 @@ Production verification completed:
   - in-app Browser clipboard verification for exact raw Markdown copy and exact bash code block copy.
 - Headless Chrome clipboard readback rejected due browser permission/user-activation constraints, so clipboard assertions were verified through the in-app Browser clipboard API. The application code for copy behavior was unchanged by the final time formatter fix.
 - Final local gate before this production deploy passed: `npm run lint && npm test && npm run build` with Vitest covering 5 files and 31 tests. The remaining build output is the known non-failing Tabler barrel/chunk-size warning.
+
+## Implementation Note: Short Manual Pairing Code
+
+Implemented on 2026-06-25:
+
+- Changed new room key generation from a long base64url secret to a 7-character manual pairing code: six digits followed by one symbol from `!@#$%^&*`.
+- Kept `sha256(roomKey)` as the backend room identifier; raw room keys are still not stored in Postgres.
+- Kept legacy/manual pasted room keys accepted so previously created rooms and older join links are not intentionally locked out by the UI.
+- Added tests for the short code format and URL encoding of symbol-bearing join links.
+
+Reason for spec deviation:
+
+- This intentionally trades high entropy for much lower device-join friction. AnyText remains scoped to temporary, low-sensitivity transfer with one-hour expiry, manual delete, and no end-to-end encryption.
