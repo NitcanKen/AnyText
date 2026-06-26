@@ -434,6 +434,7 @@ function App() {
 
   return (
     <div className="app-shell bg-[#070a0c] text-slate-100">
+      <AmbientField />
       <TopBar
         deleteConfirmationEnabled={deleteConfirmationEnabled}
         deviceName={deviceName}
@@ -453,7 +454,13 @@ function App() {
       />
 
       <main className="workspace-shell">
-        <div className="mobile-tabs md:hidden" role="tablist" aria-label="Command Deck sections">
+        <div
+          aria-label="Command Deck sections"
+          className="mobile-tabs md:hidden"
+          data-active={activeTab}
+          role="tablist"
+        >
+          <span aria-hidden className="mobile-tab-glider" />
           <button
             aria-label="Open Send tab"
             aria-selected={activeTab === 'send'}
@@ -553,7 +560,8 @@ function FirstRunScreen({ onCreate, onJoin }: FirstRunScreenProps) {
 
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-[#070a0c] p-4 text-slate-100">
-      <section className="w-full max-w-xl rounded-lg border border-white/10 bg-[#101518] p-5 shadow-2xl shadow-black/30">
+      <AmbientField />
+      <section className="first-run-card w-full max-w-xl rounded-lg border border-white/10 bg-[#101518] p-5 shadow-2xl shadow-black/30">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-lime-300">AnyText</p>
@@ -707,16 +715,19 @@ function TopBar({
   }
 
   return (
-    <header className="sticky top-0 z-20 border-b border-white/10 bg-[#070a0c]/95 backdrop-blur">
+    <header className="topbar sticky top-0 z-20 border-b border-white/10 bg-[#070a0c]/95 backdrop-blur">
       <div className="topbar-inner">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded border border-lime-300/30 bg-lime-300/10 font-mono text-sm font-bold text-lime-200">
+          <div className="brand-mark flex h-8 w-8 items-center justify-center rounded border border-lime-300/30 font-mono text-sm font-bold text-lime-200">
             AT
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold tracking-tight">AnyText</div>
-            <div className="truncate font-mono text-[11px] text-slate-500">
-              room {roomId ? roomId.slice(0, 10) : 'syncing'} · {syncStatusLabel(syncStatus)}
+            <div className="flex items-center gap-1.5 truncate font-mono text-[11px] text-slate-500">
+              <span aria-hidden className="sync-dot" data-status={syncStatus} />
+              <span className="truncate">
+                room {roomId ? roomId.slice(0, 10) : 'syncing'} · {syncStatusLabel(syncStatus)}
+              </span>
             </div>
           </div>
         </div>
@@ -847,7 +858,7 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink, onCopyPair
   const formattedManualCode = formatManualPairingCode(manualCode);
 
   return (
-    <section className="panel p-4">
+    <section className="panel pairing-card p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-sm font-semibold">Pairing QR visible</h2>
@@ -1011,7 +1022,16 @@ function Composer({
         <div className="composer-send-area">
           <SendProgress sendState={sendState} attachmentCount={attachments.length} />
           {sendState === 'failed' ? <InlineAlert message={backendError || 'Send failed. Retry after refreshing sync.'} /> : null}
-          <button className="send-button" disabled={sendDisabled} onClick={onSend} type="button">
+          <button
+            className={cx(
+              'send-button',
+              !sendDisabled && sendState === 'draft_ready' && 'send-button-ready',
+              sendState === 'sent' && 'send-button-sent',
+            )}
+            disabled={sendDisabled}
+            onClick={onSend}
+            type="button"
+          >
             {BUSY_SEND_STATES.has(sendState) ? (
               <IconLoader2 aria-hidden className="motion-safe:animate-spin" size={18} />
             ) : sendState === 'sent' ? (
@@ -1265,6 +1285,7 @@ function QueuePanel({
         <div className="detail-pane">
           {selectedItem ? (
             <MessageDetail
+              key={selectedItem.id}
               expired={selectedItemExpired}
               item={selectedItem}
               now={now}
@@ -1284,6 +1305,7 @@ function QueuePanel({
         <div className="mobile-detail-backdrop md:hidden" onClick={closeMobileDetail} role="presentation">
           <div className="mobile-detail-sheet" onClick={(event) => event.stopPropagation()}>
             <MessageDetail
+              key={mobileDetailItem.id}
               expired={selectedItemExpired}
               item={mobileDetailItem}
               now={now}
@@ -1789,6 +1811,17 @@ function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachmen
           </a>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function AmbientField() {
+  return (
+    <div className="ambient-field" aria-hidden="true">
+      <div className="ambient-aurora ambient-aurora-a" />
+      <div className="ambient-aurora ambient-aurora-b" />
+      <div className="ambient-aurora ambient-aurora-c" />
+      <div className="ambient-grid" />
     </div>
   );
 }
