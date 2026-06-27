@@ -1,0 +1,1945 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AnyText Kinetic Relay Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #020304;
+        --ink: #f7fbff;
+        --muted: rgba(236, 245, 255, 0.62);
+        --dim: rgba(236, 245, 255, 0.34);
+        --line: rgba(255, 255, 255, 0.13);
+        --line-strong: rgba(255, 255, 255, 0.26);
+        --green: #befc3c;
+        --green-rgb: 190, 252, 60;
+        --blue: #2448ff;
+        --blue-rgb: 36, 72, 255;
+        --white-rgb: 247, 251, 255;
+        --warning: #ffd166;
+        --danger: #ff7f91;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          sans-serif;
+        background: var(--bg);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-width: 320px;
+        min-height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--ink);
+      }
+
+      button,
+      input {
+        font: inherit;
+      }
+
+      button {
+        color: inherit;
+      }
+
+      button:focus-visible,
+      input:focus-visible {
+        outline: 2px solid rgba(var(--green-rgb), 0.8);
+        outline-offset: 3px;
+      }
+
+      .demo-shell {
+        position: relative;
+        width: 100vw;
+        height: 100dvh;
+        min-height: 640px;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 18% 42%, rgba(var(--blue-rgb), 0.18), transparent 28rem),
+          radial-gradient(circle at 86% 58%, rgba(var(--green-rgb), 0.12), transparent 26rem),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 10rem),
+          #020304;
+      }
+
+      #kineticCanvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .grain,
+      .scanline,
+      .vignette {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .grain {
+        opacity: 0.18;
+        mix-blend-mode: overlay;
+        background-image:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+          linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px);
+        background-size: 74px 74px;
+        mask-image: radial-gradient(circle at center, black, transparent 78%);
+      }
+
+      .scanline {
+        opacity: 0.1;
+        background: repeating-linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.08) 0,
+          rgba(255, 255, 255, 0.08) 1px,
+          transparent 1px,
+          transparent 9px
+        );
+      }
+
+      .vignette {
+        background:
+          radial-gradient(circle at center, transparent 46%, rgba(0, 0, 0, 0.35) 78%, rgba(0, 0, 0, 0.72) 100%),
+          linear-gradient(90deg, rgba(0, 0, 0, 0.72), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.72));
+      }
+
+      .top-hud {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 5;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+        align-items: center;
+        gap: 1rem;
+        height: 76px;
+        padding: 0 22px;
+        pointer-events: none;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        min-width: 0;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 2.7rem;
+        height: 2.7rem;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.28), transparent 35%),
+          rgba(255, 255, 255, 0.055);
+        color: var(--ink);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.02em;
+        box-shadow:
+          0 0 34px rgba(var(--green-rgb), 0.08),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+
+      .brand strong {
+        display: block;
+        overflow: hidden;
+        font-size: 0.92rem;
+        letter-spacing: 0.01em;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand small {
+        display: block;
+        margin-top: 0.12rem;
+        overflow: hidden;
+        color: var(--muted);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.62rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .phase-lockup {
+        justify-self: center;
+        text-align: center;
+      }
+
+      .phase-lockup .phase-code {
+        color: rgba(var(--green-rgb), 0.9);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.65rem;
+        letter-spacing: 0.24em;
+        text-transform: uppercase;
+      }
+
+      .phase-lockup .phase-title {
+        margin-top: 0.12rem;
+        font-size: clamp(1rem, 1.8vw, 1.45rem);
+        font-weight: 720;
+        letter-spacing: 0;
+        white-space: nowrap;
+      }
+
+      .phase-lockup .phase-line {
+        margin-top: 0.1rem;
+        color: var(--muted);
+        font-size: 0.72rem;
+        white-space: nowrap;
+      }
+
+      .status-strip {
+        justify-self: end;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.5rem;
+        min-width: 0;
+      }
+
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 2rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgba(5, 8, 10, 0.34);
+        padding: 0.35rem 0.62rem;
+        color: var(--muted);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.64rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        backdrop-filter: blur(18px);
+      }
+
+      .live-dot {
+        width: 0.48rem;
+        height: 0.48rem;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 18px rgba(var(--green-rgb), 0.8);
+      }
+
+      .hud-panel {
+        position: absolute;
+        z-index: 4;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.018)),
+          rgba(4, 8, 10, 0.48);
+        box-shadow:
+          0 28px 120px rgba(0, 0, 0, 0.38),
+          inset 0 1px 0 rgba(255, 255, 255, 0.13);
+        backdrop-filter: blur(22px) saturate(125%);
+        transition:
+          opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+          border-color 420ms ease;
+      }
+
+      .hud-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          radial-gradient(circle at 20% 0, rgba(255, 255, 255, 0.1), transparent 20rem),
+          linear-gradient(90deg, transparent, rgba(var(--green-rgb), 0.06), transparent);
+        opacity: 0.7;
+      }
+
+      .compose-hud {
+        left: 22px;
+        top: 104px;
+        width: min(420px, calc(50vw - 32px));
+        min-height: 380px;
+      }
+
+      .queue-hud {
+        right: 22px;
+        top: 104px;
+        width: min(430px, calc(50vw - 32px));
+        min-height: 430px;
+      }
+
+      .hud-inner {
+        position: relative;
+        padding: 1rem;
+      }
+
+      .hud-label {
+        margin: 0;
+        color: rgba(var(--green-rgb), 0.92);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.64rem;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      .hud-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-top: 0.42rem;
+        padding-bottom: 0.8rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .hud-title-row h2 {
+        margin: 0;
+        font-size: clamp(1.25rem, 2.3vw, 1.8rem);
+        line-height: 1;
+        letter-spacing: -0.01em;
+      }
+
+      .mini-readout {
+        color: var(--dim);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.62rem;
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      .payload-card {
+        position: relative;
+        overflow: hidden;
+        margin-top: 0.85rem;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 14px;
+        background:
+          linear-gradient(135deg, rgba(var(--blue-rgb), 0.14), transparent 46%),
+          rgba(0, 0, 0, 0.22);
+        padding: 0.85rem;
+      }
+
+      .payload-card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.14), transparent 44%);
+        opacity: var(--card-sweep, 0);
+        transform: translateX(var(--card-sweep-x, -120%));
+      }
+
+      .payload-card h3 {
+        margin: 0;
+        font-size: 0.98rem;
+        line-height: 1.2;
+      }
+
+      .payload-card p {
+        margin: 0.55rem 0 0;
+        color: rgba(238, 247, 255, 0.7);
+        font-size: 0.8rem;
+        line-height: 1.55;
+      }
+
+      .code-sample {
+        margin: 0.75rem 0 0;
+        overflow: hidden;
+        border: 1px solid rgba(var(--green-rgb), 0.2);
+        border-radius: 12px;
+        background: rgba(0, 0, 0, 0.42);
+      }
+
+      .code-sample .code-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        min-height: 2rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 0.35rem 0.5rem;
+        color: var(--muted);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.62rem;
+      }
+
+      .code-sample pre {
+        margin: 0;
+        overflow-x: auto;
+        padding: 0.65rem 0.7rem;
+        color: rgba(238, 247, 255, 0.9);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.72rem;
+        line-height: 1.48;
+      }
+
+      .code-sample b {
+        color: var(--green);
+        font-weight: 600;
+      }
+
+      .attachment-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.55rem;
+        margin-top: 0.7rem;
+      }
+
+      .attachment-chip,
+      .queue-item,
+      .file-row {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 13px;
+        background: rgba(255, 255, 255, 0.045);
+      }
+
+      .attachment-chip {
+        min-width: 0;
+        padding: 0.62rem;
+      }
+
+      .attachment-chip strong,
+      .queue-copy strong,
+      .file-row strong {
+        display: block;
+        overflow: hidden;
+        font-size: 0.78rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .attachment-chip small,
+      .queue-copy small,
+      .file-row small {
+        display: block;
+        margin-top: 0.26rem;
+        overflow: hidden;
+        color: var(--dim);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.58rem;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .primary-action {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 3rem;
+        margin-top: 0.8rem;
+        border: 1px solid rgba(var(--green-rgb), 0.68);
+        border-radius: 999px;
+        background:
+          radial-gradient(circle at 34% 0, rgba(255, 255, 255, 0.36), transparent 46%),
+          var(--green);
+        color: #071006;
+        cursor: pointer;
+        font-weight: 800;
+        letter-spacing: 0;
+        box-shadow:
+          0 0 34px rgba(var(--green-rgb), 0.16),
+          inset 0 1px 0 rgba(255, 255, 255, 0.44);
+        transition:
+          transform 150ms ease,
+          filter 150ms ease;
+      }
+
+      .primary-action:hover {
+        filter: brightness(1.05);
+        transform: translateY(-1px);
+      }
+
+      .primary-action:active {
+        transform: scale(0.985);
+      }
+
+      .queue-list {
+        display: grid;
+        gap: 0.58rem;
+        margin-top: 0.85rem;
+      }
+
+      .queue-item {
+        position: relative;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.68rem;
+        min-height: 4.6rem;
+        overflow: hidden;
+        padding: 0.7rem;
+        transition:
+          opacity 360ms ease,
+          transform 520ms cubic-bezier(0.22, 1, 0.36, 1),
+          border-color 360ms ease,
+          background-color 360ms ease;
+      }
+
+      .queue-item.active {
+        border-color: rgba(var(--green-rgb), 0.4);
+        background: rgba(var(--green-rgb), 0.08);
+      }
+
+      .queue-item::after {
+        content: "";
+        position: absolute;
+        left: 0.7rem;
+        right: 0.7rem;
+        bottom: 0.48rem;
+        height: 2px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .queue-item .ttl {
+        position: absolute;
+        left: 0.7rem;
+        bottom: 0.48rem;
+        width: 68%;
+        height: 2px;
+        border-radius: 999px;
+        background: rgba(var(--green-rgb), 0.82);
+        box-shadow: 0 0 18px rgba(var(--green-rgb), 0.42);
+      }
+
+      .queue-icon {
+        display: grid;
+        width: 2.35rem;
+        height: 2.35rem;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.28), transparent 42%),
+          rgba(255, 255, 255, 0.055);
+        color: var(--green);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.58rem;
+        font-weight: 800;
+      }
+
+      .detail-pane {
+        margin-top: 0.8rem;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      .detail-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.6rem;
+        min-height: 2.8rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+        padding: 0.48rem 0.58rem;
+      }
+
+      .copy-button,
+      .ghost-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2rem;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.052);
+        padding: 0.34rem 0.62rem;
+        color: rgba(238, 247, 255, 0.86);
+        cursor: pointer;
+        font-size: 0.68rem;
+        white-space: nowrap;
+        transition:
+          transform 150ms ease,
+          border-color 180ms ease,
+          background-color 180ms ease;
+      }
+
+      .copy-button:hover,
+      .ghost-button:hover {
+        border-color: rgba(var(--green-rgb), 0.35);
+        background: rgba(var(--green-rgb), 0.08);
+      }
+
+      .copy-button:active,
+      .ghost-button:active {
+        transform: scale(0.97);
+      }
+
+      .detail-content {
+        padding: 0.68rem;
+      }
+
+      .file-stack {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.52rem;
+        margin-top: 0.6rem;
+      }
+
+      .file-row {
+        padding: 0.58rem;
+      }
+
+      .bottom-controls {
+        position: absolute;
+        left: 22px;
+        right: 22px;
+        bottom: 20px;
+        z-index: 5;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 0.75rem;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.028)),
+          rgba(3, 7, 9, 0.56);
+        padding: 0.58rem;
+        box-shadow:
+          0 24px 100px rgba(0, 0, 0, 0.4),
+          inset 0 1px 0 rgba(255, 255, 255, 0.13);
+        backdrop-filter: blur(24px) saturate(135%);
+      }
+
+      .transport {
+        display: flex;
+        align-items: center;
+        gap: 0.42rem;
+      }
+
+      .round-button {
+        display: grid;
+        width: 2.5rem;
+        height: 2.5rem;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.055);
+        color: var(--ink);
+        cursor: pointer;
+        font-size: 0.72rem;
+        transition:
+          transform 150ms ease,
+          border-color 180ms ease,
+          background-color 180ms ease;
+      }
+
+      .round-button:hover {
+        border-color: rgba(var(--green-rgb), 0.38);
+        background: rgba(var(--green-rgb), 0.1);
+      }
+
+      .round-button:active {
+        transform: scale(0.94);
+      }
+
+      .timeline {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.35rem;
+      }
+
+      .timeline-input {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        margin: 0;
+        accent-color: var(--green);
+      }
+
+      .timeline-track {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0.62rem;
+        height: 2px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .timeline-fill {
+        display: block;
+        width: 0%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--green), #ffffff);
+        box-shadow: 0 0 18px rgba(var(--green-rgb), 0.6);
+      }
+
+      .phase-ticks {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        color: var(--dim);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.56rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .phase-ticks span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .phase-ticks span.active {
+        color: var(--green);
+      }
+
+      .quick-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.42rem;
+      }
+
+      .floating-caption {
+        position: absolute;
+        left: 50%;
+        bottom: 100px;
+        z-index: 4;
+        width: min(760px, calc(100vw - 44px));
+        color: rgba(247, 251, 255, 0.94);
+        text-align: center;
+        transform: translateX(-50%);
+        pointer-events: none;
+      }
+
+      .floating-caption h1 {
+        margin: 0;
+        font-size: clamp(2.7rem, 8.8vw, 9.4rem);
+        line-height: 0.82;
+        letter-spacing: -0.065em;
+        text-transform: uppercase;
+      }
+
+      .floating-caption p {
+        width: min(560px, 92vw);
+        margin: 1rem auto 0;
+        color: rgba(238, 247, 255, 0.68);
+        font-size: clamp(0.92rem, 1.25vw, 1.1rem);
+        line-height: 1.55;
+      }
+
+      .scene-word {
+        display: inline-block;
+        transform-origin: center;
+        transition:
+          opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+          transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      .is-playing .scene-word {
+        opacity: 0.08;
+        transform: translateY(-28px) scale(0.94);
+      }
+
+      .is-past-intro .floating-caption {
+        opacity: 0;
+        transform: translateX(-50%) translateY(24px) scale(0.96);
+        transition:
+          opacity 500ms ease,
+          transform 500ms ease;
+      }
+
+      .toast {
+        position: absolute;
+        left: 50%;
+        top: 88px;
+        z-index: 8;
+        border: 1px solid rgba(var(--green-rgb), 0.36);
+        border-radius: 999px;
+        background: rgba(4, 10, 8, 0.78);
+        padding: 0.52rem 0.8rem;
+        color: var(--green);
+        font-family:
+          ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          Monaco,
+          Consolas,
+          monospace;
+        font-size: 0.66rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateX(-50%) translateY(-10px);
+        transition:
+          opacity 240ms ease,
+          transform 240ms ease;
+        backdrop-filter: blur(16px);
+      }
+
+      .toast.visible {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .hud-hidden .compose-hud,
+      .hud-hidden .queue-hud {
+        opacity: 0;
+        transform: translateY(18px) scale(0.98);
+        pointer-events: none;
+      }
+
+      .state-intro .compose-hud,
+      .state-intro .queue-hud {
+        opacity: 0;
+        transform: translateY(20px) scale(0.98);
+        pointer-events: none;
+      }
+
+      .state-compose .compose-hud,
+      .state-attach .compose-hud,
+      .state-package .compose-hud {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .state-compose .queue-hud,
+      .state-attach .queue-hud,
+      .state-package .queue-hud {
+        opacity: 0.42;
+        transform: translateY(18px) scale(0.985);
+      }
+
+      .state-transmit .compose-hud,
+      .state-transmit .queue-hud {
+        opacity: 0.24;
+        transform: translateY(20px) scale(0.98);
+      }
+
+      .state-receive .queue-hud,
+      .state-copy .queue-hud,
+      .state-expire .queue-hud {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+
+      .state-receive .compose-hud,
+      .state-copy .compose-hud,
+      .state-expire .compose-hud {
+        opacity: 0.38;
+        transform: translateY(18px) scale(0.985);
+      }
+
+      .state-attach .payload-card {
+        --card-sweep: 1;
+        --card-sweep-x: 120%;
+        transition: --card-sweep-x 900ms ease;
+      }
+
+      .state-copy .copy-button.primary-copy {
+        border-color: rgba(var(--green-rgb), 0.54);
+        background: rgba(var(--green-rgb), 0.11);
+        color: var(--green);
+      }
+
+      .state-expire .queue-item.active {
+        border-color: rgba(255, 209, 102, 0.34);
+        background: rgba(255, 209, 102, 0.07);
+      }
+
+      .state-expire .queue-item .ttl {
+        width: 10%;
+        background: var(--warning);
+        box-shadow: 0 0 18px rgba(255, 209, 102, 0.48);
+      }
+
+      .reduced-motion *,
+      .reduced-motion *::before,
+      .reduced-motion *::after {
+        animation: none !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+
+      @media (max-width: 1120px) {
+        .compose-hud,
+        .queue-hud {
+          width: min(380px, calc(50vw - 26px));
+        }
+
+        .floating-caption h1 {
+          font-size: clamp(2.5rem, 9vw, 6.8rem);
+        }
+      }
+
+      @media (max-width: 980px) {
+        .compose-hud {
+          left: 14px;
+          right: 14px;
+          top: 88px;
+          width: auto;
+          min-height: auto;
+        }
+
+        .queue-hud {
+          left: 14px;
+          right: 14px;
+          top: auto;
+          bottom: 150px;
+          width: auto;
+          min-height: auto;
+          max-height: min(43dvh, calc(100dvh - 250px));
+        }
+
+        .state-intro .compose-hud,
+        .state-intro .queue-hud,
+        .state-transmit .compose-hud,
+        .state-transmit .queue-hud,
+        .state-compose .queue-hud,
+        .state-attach .queue-hud,
+        .state-package .queue-hud,
+        .state-receive .compose-hud,
+        .state-copy .compose-hud,
+        .state-expire .compose-hud {
+          opacity: 0;
+          transform: translateY(18px) scale(0.98);
+          pointer-events: none;
+        }
+
+        .state-compose .compose-hud,
+        .state-attach .compose-hud,
+        .state-package .compose-hud,
+        .state-receive .queue-hud,
+        .state-copy .queue-hud,
+        .state-expire .queue-hud {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+          pointer-events: auto;
+        }
+      }
+
+      @media (max-width: 820px) {
+        .demo-shell {
+          min-height: 720px;
+        }
+
+        .top-hud {
+          grid-template-columns: minmax(0, 1fr) auto;
+          height: auto;
+          padding-top: 14px;
+        }
+
+        .phase-lockup {
+          display: none;
+        }
+
+        .status-strip {
+          display: none;
+        }
+
+        .status-pill.extra {
+          display: none;
+        }
+
+        .compose-hud {
+          left: 12px;
+          right: 12px;
+          top: 88px;
+          width: auto;
+          min-height: auto;
+        }
+
+        .queue-hud {
+          left: 12px;
+          right: 12px;
+          top: auto;
+          bottom: 150px;
+          width: auto;
+          min-height: auto;
+          max-height: 42dvh;
+        }
+
+        .queue-hud .payload-card,
+        .queue-hud .detail-pane {
+          display: none;
+        }
+
+        .attachment-grid,
+        .file-stack {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
+        .bottom-controls {
+          left: 12px;
+          right: 12px;
+          bottom: 12px;
+          grid-template-columns: minmax(0, 1fr);
+          border-radius: 22px;
+        }
+
+        .transport,
+        .quick-actions {
+          justify-content: center;
+        }
+
+        .phase-ticks {
+          display: none;
+        }
+
+        .floating-caption {
+          bottom: 126px;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .demo-shell {
+          min-height: 760px;
+        }
+
+        .brand small {
+          max-width: 12rem;
+        }
+
+        .status-pill {
+          padding-inline: 0.48rem;
+        }
+
+        .compose-hud {
+          display: none;
+        }
+
+        .queue-hud {
+          bottom: 156px;
+        }
+
+        .floating-caption h1 {
+          font-size: clamp(2.3rem, 16vw, 4.8rem);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="demo-shell state-intro" id="shell">
+      <canvas id="kineticCanvas" aria-label="AnyText kinetic relay scene"></canvas>
+      <div class="grain" aria-hidden="true"></div>
+      <div class="scanline" aria-hidden="true"></div>
+      <div class="vignette" aria-hidden="true"></div>
+
+      <header class="top-hud">
+        <div class="brand">
+          <div class="brand-mark">AT</div>
+          <div>
+            <strong>AnyText</strong>
+            <small>private relay experience</small>
+          </div>
+        </div>
+
+        <div class="phase-lockup" aria-live="polite">
+          <div class="phase-code" id="phaseCode">00 / STANDBY</div>
+          <div class="phase-title" id="phaseTitle">Kinetic relay ready</div>
+          <div class="phase-line" id="phaseLine">Press play to watch payload become motion.</div>
+        </div>
+
+        <div class="status-strip">
+          <span class="status-pill"><span class="live-dot"></span> front-end only</span>
+          <span class="status-pill extra" id="fpsReadout">60 fps target</span>
+        </div>
+      </header>
+
+      <section class="hud-panel compose-hud" aria-label="Composer HUD">
+        <div class="hud-inner">
+          <p class="hud-label">Compose</p>
+          <div class="hud-title-row">
+            <h2>Payload bay</h2>
+            <span class="mini-readout">LOCAL DRAFT<br />2.4 KB</span>
+          </div>
+
+          <article class="payload-card">
+            <h3>Deploy notes</h3>
+            <p>Run the migration, verify signed URLs, then smoke test the receiver on another device.</p>
+            <div class="code-sample">
+              <div class="code-head">
+                <span>bash</span>
+                <span>command payload</span>
+              </div>
+              <pre><code>$ npm run lint &amp;&amp; npm test &amp;&amp; npm run build
+<b>passed</b> 33 tests · bundle ready</code></pre>
+            </div>
+          </article>
+
+          <div class="attachment-grid">
+            <div class="attachment-chip">
+              <strong>terminal-shot.png</strong>
+              <small>image · 1.8 MB</small>
+            </div>
+            <div class="attachment-chip">
+              <strong>smoke-artifacts.zip</strong>
+              <small>archive · 612 KB</small>
+            </div>
+          </div>
+
+          <button class="primary-action" id="sendAction" type="button">Send payload</button>
+        </div>
+      </section>
+
+      <section class="hud-panel queue-hud" aria-label="Queue HUD">
+        <div class="hud-inner">
+          <p class="hud-label">Queue</p>
+          <div class="hud-title-row">
+            <h2>Transmission feed</h2>
+            <span class="mini-readout">PUBLISHED<br />1H TTL</span>
+          </div>
+
+          <div class="queue-list">
+            <article class="queue-item active">
+              <div class="queue-icon">MD</div>
+              <div class="queue-copy">
+                <strong>Deploy notes</strong>
+                <small>MacBook Pro · just now · Markdown + 2 files</small>
+              </div>
+              <span class="ttl"></span>
+            </article>
+            <article class="queue-item">
+              <div class="queue-icon">SH</div>
+              <div class="queue-copy">
+                <strong>Database cleanup command</strong>
+                <small>iPhone · 18m ago · command block</small>
+              </div>
+              <span class="ttl" style="width: 48%"></span>
+            </article>
+          </div>
+
+          <div class="detail-pane">
+            <div class="detail-toolbar">
+              <span class="hud-label">Detail</span>
+              <button class="copy-button primary-copy" id="copyAction" type="button">Copy command</button>
+            </div>
+            <div class="detail-content">
+              <div class="code-sample">
+                <div class="code-head">
+                  <span>bash · exact copy</span>
+                  <span>receiver-ready</span>
+                </div>
+                <pre><code>$ npm run lint &amp;&amp; npm test &amp;&amp; npm run build</code></pre>
+              </div>
+              <div class="file-stack">
+                <div class="file-row">
+                  <strong>terminal-shot.png</strong>
+                  <small>image preview</small>
+                </div>
+                <div class="file-row">
+                  <strong>smoke-artifacts.zip</strong>
+                  <small>download only</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div class="floating-caption" id="caption">
+        <h1><span class="scene-word">Relay</span> <span class="scene-word">as</span> <span class="scene-word">motion</span></h1>
+        <p>AnyText becomes a kinetic handoff system: paste, package, transmit, receive, copy, expire.</p>
+      </div>
+
+      <div class="toast" id="toast">Command copied to clipboard</div>
+
+      <section class="bottom-controls" aria-label="Demo controls">
+        <div class="transport">
+          <button class="round-button" id="playPause" type="button" aria-label="Play or pause">PLAY</button>
+          <button class="round-button" id="restart" type="button" aria-label="Restart">RST</button>
+        </div>
+
+        <div class="timeline">
+          <div class="timeline-track"><span class="timeline-fill" id="timelineFill"></span></div>
+          <input class="timeline-input" id="timelineInput" min="0" max="1000" step="1" type="range" value="0" aria-label="Timeline" />
+          <div class="phase-ticks" id="phaseTicks">
+            <span data-tick="intro">intro</span>
+            <span data-tick="compose">paste</span>
+            <span data-tick="attach">attach</span>
+            <span data-tick="package">package</span>
+            <span data-tick="transmit">transmit</span>
+            <span data-tick="receive">receive</span>
+            <span data-tick="copy">copy</span>
+          </div>
+        </div>
+
+        <div class="quick-actions">
+          <button class="ghost-button" data-jump="0.2" type="button">Paste</button>
+          <button class="ghost-button" data-jump="0.36" type="button">Attach</button>
+          <button class="ghost-button" data-jump="0.5" type="button">Send</button>
+          <button class="ghost-button" data-jump="0.76" type="button">Receive</button>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const canvas = document.getElementById("kineticCanvas");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      const shell = document.getElementById("shell");
+      const timelineInput = document.getElementById("timelineInput");
+      const timelineFill = document.getElementById("timelineFill");
+      const playPause = document.getElementById("playPause");
+      const restart = document.getElementById("restart");
+      const sendAction = document.getElementById("sendAction");
+      const copyAction = document.getElementById("copyAction");
+      const toast = document.getElementById("toast");
+      const fpsReadout = document.getElementById("fpsReadout");
+      const phaseCode = document.getElementById("phaseCode");
+      const phaseTitle = document.getElementById("phaseTitle");
+      const phaseLine = document.getElementById("phaseLine");
+      const phaseTicks = [...document.querySelectorAll("[data-tick]")];
+
+      const state = {
+        dpr: 1,
+        width: 1,
+        height: 1,
+        progress: 0,
+        target: 0,
+        playing: false,
+        lastTime: performance.now(),
+        pointerX: 0,
+        pointerY: 0,
+        reducedMotion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+        lastPhase: "intro",
+        frameCount: 0,
+        fpsTime: performance.now(),
+      };
+
+      const phases = [
+        {
+          key: "intro",
+          at: 0,
+          code: "00 / STANDBY",
+          title: "Kinetic relay ready",
+          line: "The product starts as a quiet scene, not a dashboard.",
+        },
+        {
+          key: "compose",
+          at: 0.14,
+          code: "01 / PASTE",
+          title: "Payload surface generated",
+          line: "Markdown becomes a physical data slab in the scene.",
+        },
+        {
+          key: "attach",
+          at: 0.28,
+          code: "02 / ATTACH",
+          title: "Modules magnetize",
+          line: "Files join the payload as objects with weight and orbit.",
+        },
+        {
+          key: "package",
+          at: 0.42,
+          code: "03 / PACKAGE",
+          title: "Relay capsule sealed",
+          line: "The interface compresses before the main transmission.",
+        },
+        {
+          key: "transmit",
+          at: 0.53,
+          code: "04 / TRANSMIT",
+          title: "Transmission corridor",
+          line: "The cinematic moment belongs to Send.",
+        },
+        {
+          key: "receive",
+          at: 0.73,
+          code: "05 / RECEIVE",
+          title: "Queue lock-in",
+          line: "Receiver sees the item only after it arrives complete.",
+        },
+        {
+          key: "copy",
+          at: 0.86,
+          code: "06 / EXTRACT",
+          title: "Command extraction",
+          line: "Copy is a local extraction pulse, not a generic toast.",
+        },
+        {
+          key: "expire",
+          at: 0.95,
+          code: "07 / DISSOLVE",
+          title: "Temporary by design",
+          line: "The payload decays instead of becoming permanent archive.",
+        },
+      ];
+
+      const particles = Array.from({ length: 190 }, (_, index) => {
+        const seed = Math.sin(index * 91.17) * 10000;
+        const rand = seed - Math.floor(seed);
+        return {
+          x: (rand * 2 - 1) * 1600,
+          y: ((Math.sin(index * 12.7) * 0.5 + 0.5) * 2 - 1) * 840,
+          z: 180 + ((Math.cos(index * 9.31) * 0.5 + 0.5) * 1450),
+          s: 0.45 + ((Math.sin(index * 5.13) * 0.5 + 0.5) * 1.8),
+          hue: index % 5 === 0 ? "green" : index % 7 === 0 ? "blue" : "white",
+          drift: 0.22 + ((Math.cos(index * 3.41) * 0.5 + 0.5) * 0.8),
+        };
+      });
+
+      const cylinders = Array.from({ length: 15 }, (_, index) => ({
+        x: (index % 5 - 2) * 360 + Math.sin(index * 4.4) * 80,
+        y: (Math.floor(index / 5) - 1) * 210 + Math.cos(index * 3.2) * 70,
+        z: 420 + index * 82,
+        r: 42 + (index % 4) * 12,
+        len: 98 + (index % 5) * 28,
+        rot: index * 0.72,
+        color: index % 3 === 0 ? "blue" : index % 3 === 1 ? "white" : "black",
+      }));
+
+      function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function mix(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      function smooth(edge0, edge1, x) {
+        const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+        return t * t * (3 - 2 * t);
+      }
+
+      function easeOutCubic(t) {
+        return 1 - Math.pow(1 - t, 3);
+      }
+
+      function easeInOutCubic(t) {
+        return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      }
+
+      function phaseFor(progress) {
+        let current = phases[0];
+        for (const phase of phases) {
+          if (progress >= phase.at) current = phase;
+        }
+        return current;
+      }
+
+      function resize() {
+        state.dpr = Math.min(window.devicePixelRatio || 1, 2);
+        state.width = window.innerWidth;
+        state.height = window.innerHeight;
+        canvas.width = Math.floor(state.width * state.dpr);
+        canvas.height = Math.floor(state.height * state.dpr);
+        canvas.style.width = `${state.width}px`;
+        canvas.style.height = `${state.height}px`;
+        ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+      }
+
+      function camera(progress) {
+        const mobileTransmitFollow = state.width < 620 ? smooth(0.45, 0.76, progress) * 165 : 0;
+        return {
+          x: state.pointerX * 52 + mix(-90, 90, smooth(0.45, 0.78, progress)) + mobileTransmitFollow,
+          y: state.pointerY * 38 + mix(28, -28, smooth(0.18, 0.9, progress)),
+          z: mix(-160, 130, smooth(0.36, 0.7, progress)),
+          fov: mix(state.width < 620 ? 580 : 720, state.width < 620 ? 780 : 880, smooth(0.5, 0.78, progress)),
+          roll: state.pointerX * 0.018 + Math.sin(progress * Math.PI * 2) * 0.01,
+        };
+      }
+
+      function project(point, cam) {
+        const z = point.z - cam.z;
+        const scale = cam.fov / Math.max(80, cam.fov + z);
+        const x = (point.x - cam.x) * scale;
+        const y = (point.y - cam.y) * scale;
+        const cos = Math.cos(cam.roll);
+        const sin = Math.sin(cam.roll);
+        return {
+          x: state.width / 2 + x * cos - y * sin,
+          y: state.height / 2 + x * sin + y * cos,
+          scale,
+          alpha: clamp(1 - z / 2400, 0.08, 1),
+        };
+      }
+
+      function colorFor(name, alpha) {
+        if (name === "green") return `rgba(190, 252, 60, ${alpha})`;
+        if (name === "blue") return `rgba(36, 72, 255, ${alpha})`;
+        if (name === "black") return `rgba(9, 10, 11, ${alpha})`;
+        return `rgba(247, 251, 255, ${alpha})`;
+      }
+
+      function drawBackground(progress, cam, time) {
+        ctx.clearRect(0, 0, state.width, state.height);
+
+        const bg = ctx.createRadialGradient(
+          state.width * (0.52 + state.pointerX * 0.05),
+          state.height * (0.48 + state.pointerY * 0.04),
+          20,
+          state.width * 0.5,
+          state.height * 0.5,
+          Math.max(state.width, state.height) * 0.78,
+        );
+        bg.addColorStop(0, "rgba(18, 22, 28, 0.9)");
+        bg.addColorStop(0.32, "rgba(2, 3, 4, 0.94)");
+        bg.addColorStop(1, "rgba(0, 0, 0, 1)");
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, state.width, state.height);
+
+        const tunnel = smooth(0.46, 0.72, progress) * (1 - smooth(0.78, 0.95, progress));
+        if (tunnel > 0.01) {
+          ctx.save();
+          ctx.globalAlpha = tunnel * 0.44;
+          ctx.translate(state.width / 2, state.height / 2);
+          for (let i = 0; i < 22; i++) {
+            const radius = (i * 54 + time * 0.05) % 1180;
+            ctx.beginPath();
+            ctx.strokeStyle = i % 3 === 0 ? "rgba(190,252,60,0.16)" : "rgba(255,255,255,0.09)";
+            ctx.lineWidth = 1;
+            ctx.ellipse(0, 0, radius * 1.22, radius * 0.34, -0.12, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
+        particles.forEach((particle, index) => {
+          const local = {
+            x: particle.x + Math.sin(time * 0.00018 * particle.drift + index) * 38,
+            y: particle.y + Math.cos(time * 0.00022 * particle.drift + index * 0.3) * 26,
+            z: ((particle.z - time * 0.018 * particle.drift + progress * 260) % 1700) + 130,
+          };
+          const p = project(local, cam);
+          const size = particle.s * p.scale * (1 + tunnel * 2.2);
+          ctx.globalAlpha = p.alpha * (0.18 + tunnel * 0.48);
+          ctx.fillStyle = colorFor(particle.hue, 1);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fill();
+        });
+        ctx.globalAlpha = 1;
+      }
+
+      function drawCylinder(cx, cy, z, radius, length, rot, color, alpha, cam) {
+        const center = project({ x: cx, y: cy, z }, cam);
+        const scale = center.scale;
+        const w = length * scale;
+        const h = radius * scale;
+        if (center.x < -200 || center.x > state.width + 200 || center.y < -200 || center.y > state.height + 200) return;
+
+        ctx.save();
+        ctx.translate(center.x, center.y);
+        ctx.rotate(rot);
+        ctx.globalAlpha = alpha * center.alpha;
+        const body = ctx.createLinearGradient(-w / 2, -h, w / 2, h);
+        if (color === "blue") {
+          body.addColorStop(0, "#1831c9");
+          body.addColorStop(0.42, "#2d55ff");
+          body.addColorStop(1, "#07144f");
+        } else if (color === "black") {
+          body.addColorStop(0, "#33363b");
+          body.addColorStop(0.45, "#08090a");
+          body.addColorStop(1, "#000000");
+        } else {
+          body.addColorStop(0, "#ffffff");
+          body.addColorStop(0.52, "#cdd3d8");
+          body.addColorStop(1, "#ffffff");
+        }
+        ctx.fillStyle = body;
+        roundRect(ctx, -w / 2, -h, w, h * 2, h);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.16)";
+        ctx.lineWidth = Math.max(0.6, 1.2 * scale);
+        ctx.stroke();
+
+        ctx.fillStyle = color === "black" ? "rgba(0,0,0,0.78)" : "rgba(2,3,4,0.42)";
+        ctx.beginPath();
+        ctx.ellipse(w / 2, 0, h * 0.68, h * 0.95, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.72)";
+        ctx.beginPath();
+        ctx.ellipse(w / 2, 0, h * 0.24, h * 0.36, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      function roundRect(context, x, y, width, height, radius) {
+        const r = Math.min(radius, width / 2, height / 2);
+        context.beginPath();
+        context.moveTo(x + r, y);
+        context.arcTo(x + width, y, x + width, y + height, r);
+        context.arcTo(x + width, y + height, x, y + height, r);
+        context.arcTo(x, y + height, x, y, r);
+        context.arcTo(x, y, x + width, y, r);
+        context.closePath();
+      }
+
+      function drawAmbientForms(progress, cam, time) {
+        const introFade = 1 - smooth(0.35, 0.55, progress);
+        const receiveFade = smooth(0.72, 0.95, progress);
+        cylinders.forEach((cylinder, index) => {
+          const orbit = time * 0.00012 + index * 0.7;
+          const transmitPush = smooth(0.45, 0.7, progress) * 180;
+          drawCylinder(
+            cylinder.x + Math.sin(orbit) * 80 - transmitPush,
+            cylinder.y + Math.cos(orbit * 0.8) * 50 + receiveFade * 60,
+            cylinder.z + Math.sin(orbit * 0.7) * 90,
+            cylinder.r,
+            cylinder.len,
+            cylinder.rot + time * 0.00008 + progress * 0.8,
+            cylinder.color,
+            0.08 + introFade * 0.46 + receiveFade * 0.12,
+            cam,
+          );
+        });
+      }
+
+      function drawDataSlab(progress, cam, time) {
+        const appear = smooth(0.1, 0.24, progress);
+        const attach = smooth(0.25, 0.38, progress);
+        const pack = smooth(0.4, 0.53, progress);
+        const leave = smooth(0.5, 0.62, progress);
+        if (appear <= 0 && pack >= 1) return;
+
+        const x = mix(-310, -55, pack) + leave * 360;
+        const y = mix(12, -16, pack);
+        const z = mix(420, 250, pack) - leave * 80;
+        const p = project({ x, y, z }, cam);
+        const w = mix(360, 180, pack) * p.scale;
+        const h = mix(230, 100, pack) * p.scale;
+        const alpha = appear * (1 - smooth(0.62, 0.72, progress));
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(-0.1 + state.pointerX * 0.02 + pack * 0.14);
+        ctx.scale(1, 0.88 + pack * 0.2);
+        ctx.globalAlpha = alpha * p.alpha;
+
+        const slab = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+        slab.addColorStop(0, "rgba(255,255,255,0.19)");
+        slab.addColorStop(0.4, "rgba(36,72,255,0.14)");
+        slab.addColorStop(1, "rgba(190,252,60,0.12)");
+        ctx.fillStyle = slab;
+        roundRect(ctx, -w / 2, -h / 2, w, h, 24 * p.scale);
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255,255,255,${0.18 + attach * 0.12})`;
+        ctx.lineWidth = Math.max(1, 1.6 * p.scale);
+        ctx.stroke();
+
+        ctx.save();
+        ctx.beginPath();
+        roundRect(ctx, -w / 2, -h / 2, w, h, 24 * p.scale);
+        ctx.clip();
+        const lineCount = 11;
+        for (let i = 0; i < lineCount; i++) {
+          const yy = -h * 0.38 + i * (h * 0.075);
+          const lineW = w * (0.3 + ((i * 17) % 9) * 0.055);
+          ctx.fillStyle = i === 4 ? "rgba(190,252,60,0.58)" : "rgba(255,255,255,0.28)";
+          roundRect(ctx, -w * 0.39, yy, lineW, Math.max(2, 4 * p.scale), 3);
+          ctx.fill();
+        }
+        for (let i = 0; i < 6; i++) {
+          const yy = h * 0.18 + i * (h * 0.055);
+          ctx.fillStyle = i === 1 ? "rgba(190,252,60,0.5)" : "rgba(255,255,255,0.18)";
+          roundRect(ctx, -w * 0.39, yy, w * 0.72, Math.max(2, 3.2 * p.scale), 3);
+          ctx.fill();
+        }
+
+        const sweep = (time * 0.00022 + attach * 0.7) % 1;
+        ctx.fillStyle = "rgba(255,255,255,0.16)";
+        ctx.translate(-w + sweep * w * 2, 0);
+        ctx.rotate(0.15);
+        ctx.fillRect(-w * 0.04, -h, w * 0.08, h * 2);
+        ctx.restore();
+        ctx.restore();
+      }
+
+      function drawAttachmentModules(progress, cam, time) {
+        const appear = smooth(0.22, 0.34, progress);
+        const attach = smooth(0.32, 0.45, progress);
+        const pack = smooth(0.44, 0.54, progress);
+        const leave = smooth(0.54, 0.64, progress);
+        const alpha = appear * (1 - leave);
+        if (alpha <= 0) return;
+
+        const baseX = mix(50, -25, pack) + leave * 270;
+        const baseY = mix(-80, -12, pack);
+        const baseZ = mix(390, 250, pack);
+        const moduleData = [
+          { ox: 210, oy: -90, label: "IMG", color: "blue" },
+          { ox: 250, oy: 82, label: "ZIP", color: "green" },
+          { ox: 140, oy: 8, label: "MD", color: "white" },
+        ];
+
+        moduleData.forEach((module, index) => {
+          const orbit = time * 0.0011 + index * 2.3;
+          const x = mix(module.ox + Math.cos(orbit) * 24, baseX + Math.cos(orbit) * 32, attach);
+          const y = mix(module.oy + Math.sin(orbit) * 24, baseY + Math.sin(orbit * 1.2) * 20, attach);
+          const z = baseZ + index * 28 + Math.sin(orbit) * 16;
+          const p = project({ x, y, z }, cam);
+          const size = mix(74, 44, pack) * p.scale;
+          ctx.save();
+          ctx.translate(p.x, p.y);
+          ctx.rotate(orbit * 0.08 + index * 0.2);
+          ctx.globalAlpha = alpha * p.alpha;
+          const gradient = ctx.createRadialGradient(-size * 0.2, -size * 0.25, 2, 0, 0, size);
+          gradient.addColorStop(0, "rgba(255,255,255,0.56)");
+          gradient.addColorStop(0.38, module.color === "blue" ? "rgba(36,72,255,0.88)" : module.color === "green" ? "rgba(190,252,60,0.82)" : "rgba(255,255,255,0.82)");
+          gradient.addColorStop(1, "rgba(0,0,0,0.2)");
+          ctx.fillStyle = gradient;
+          roundRect(ctx, -size / 2, -size / 2, size, size, size * 0.28);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,0.2)";
+          ctx.lineWidth = Math.max(0.7, 1.4 * p.scale);
+          ctx.stroke();
+          ctx.fillStyle = module.color === "green" ? "rgba(6,12,6,0.8)" : "rgba(255,255,255,0.88)";
+          ctx.font = `${Math.max(9, 13 * p.scale)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(module.label, 0, 1);
+          ctx.restore();
+        });
+      }
+
+      function drawCapsule(progress, cam, time) {
+        const pack = smooth(0.42, 0.54, progress);
+        const fly = smooth(0.52, 0.73, progress);
+        const unpack = smooth(0.72, 0.84, progress);
+        const alive = pack * (1 - smooth(0.84, 0.92, progress));
+        if (alive <= 0) return;
+
+        const arc = easeInOutCubic(fly);
+        const x = mix(-80, 310, arc);
+        const y = -34 + Math.sin(arc * Math.PI) * -140;
+        const z = mix(240, 180, arc) - Math.sin(arc * Math.PI) * 100;
+        const p = project({ x, y, z }, cam);
+        const w = mix(120, 220, Math.sin(arc * Math.PI)) * (1 - unpack * 0.35) * p.scale;
+        const h = mix(54, 74, Math.sin(arc * Math.PI)) * (1 - unpack * 0.2) * p.scale;
+        const rotate = -0.2 + arc * 0.42 + time * 0.00014;
+
+        if (fly > 0.02 && fly < 0.97) {
+          drawTransmissionRibbon(progress, cam, arc);
+        }
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(rotate);
+        ctx.globalAlpha = alive * p.alpha;
+        const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, w * 0.95);
+        glow.addColorStop(0, "rgba(190,252,60,0.2)");
+        glow.addColorStop(1, "rgba(190,252,60,0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, w * 1.1, h * 1.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const body = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+        body.addColorStop(0, "rgba(255,255,255,0.96)");
+        body.addColorStop(0.28, "rgba(190,252,60,0.78)");
+        body.addColorStop(0.68, "rgba(36,72,255,0.82)");
+        body.addColorStop(1, "rgba(10,12,14,0.92)");
+        ctx.fillStyle = body;
+        roundRect(ctx, -w / 2, -h / 2, w, h, h / 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255,255,255,0.34)";
+        ctx.lineWidth = Math.max(1, 1.4 * p.scale);
+        ctx.stroke();
+
+        for (let i = 0; i < 3; i++) {
+          ctx.strokeStyle = `rgba(0,0,0,${0.18 + i * 0.06})`;
+          ctx.lineWidth = Math.max(1, 1.4 * p.scale);
+          ctx.beginPath();
+          ctx.moveTo(-w * 0.18 + i * w * 0.12, -h * 0.36);
+          ctx.lineTo(-w * 0.1 + i * w * 0.12, h * 0.36);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      function drawTransmissionRibbon(progress, cam, arc) {
+        const start = project({ x: -96, y: -22, z: 260 }, cam);
+        const end = project({ x: mix(-60, 310, arc), y: -50 + Math.sin(arc * Math.PI) * -120, z: 220 }, cam);
+        ctx.save();
+        ctx.globalAlpha = smooth(0.5, 0.58, progress) * (1 - smooth(0.75, 0.82, progress));
+        const gradient = ctx.createLinearGradient(start.x, start.y, end.x, end.y);
+        gradient.addColorStop(0, "rgba(190,252,60,0)");
+        gradient.addColorStop(0.42, "rgba(190,252,60,0.6)");
+        gradient.addColorStop(1, "rgba(255,255,255,0.05)");
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = mix(2, 8, Math.sin(arc * Math.PI));
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.bezierCurveTo(
+          mix(start.x, end.x, 0.35),
+          start.y - state.height * 0.18,
+          mix(start.x, end.x, 0.62),
+          end.y + state.height * 0.08,
+          end.x,
+          end.y,
+        );
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      function drawReceiver(progress, cam, time) {
+        const receive = smooth(0.68, 0.82, progress);
+        const copy = smooth(0.84, 0.9, progress);
+        const expire = smooth(0.94, 1, progress);
+        if (receive <= 0.01) return;
+
+        const center = project({ x: 340, y: 10, z: 260 }, cam);
+        const radius = mix(34, 150, receive) * center.scale;
+        ctx.save();
+        ctx.translate(center.x, center.y);
+        ctx.globalAlpha = center.alpha * (1 - expire * 0.5);
+
+        for (let i = 0; i < 4; i++) {
+          const r = radius + i * 24 * center.scale + Math.sin(time * 0.002 + i) * 3;
+          ctx.strokeStyle = i % 2 === 0 ? `rgba(190,252,60,${0.26 - i * 0.035})` : `rgba(255,255,255,${0.18 - i * 0.03})`;
+          ctx.lineWidth = Math.max(1, 1.2 * center.scale);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, r * 1.35, r * 0.44, -0.1 + i * 0.05, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        const panelAlpha = smooth(0.76, 0.86, progress) * (1 - expire);
+        if (panelAlpha > 0.01) {
+          ctx.globalAlpha = panelAlpha;
+          for (let i = 0; i < 5; i++) {
+            const y = -70 * center.scale + i * 30 * center.scale;
+            const w = (140 + (i % 2) * 40) * center.scale;
+            const h = 10 * center.scale;
+            ctx.fillStyle = i === 2 && copy > 0.05 ? "rgba(190,252,60,0.86)" : "rgba(255,255,255,0.38)";
+            roundRect(ctx, -w / 2, y, w, h, h / 2);
+            ctx.fill();
+          }
+        }
+
+        if (copy > 0.01) {
+          ctx.globalAlpha = (1 - smooth(0.9, 0.96, progress)) * 0.8;
+          ctx.strokeStyle = "rgba(190,252,60,0.86)";
+          ctx.lineWidth = 2;
+          const pulse = mix(40, 170, copy) * center.scale;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, pulse * 1.2, pulse * 0.38, -0.08, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        if (expire > 0.01) {
+          ctx.globalAlpha = expire * 0.9;
+          for (let i = 0; i < 32; i++) {
+            const a = i * 0.58 + time * 0.001;
+            const r = (70 + i * 4 + expire * 120) * center.scale;
+            ctx.fillStyle = i % 3 === 0 ? "rgba(255,209,102,0.68)" : "rgba(255,255,255,0.32)";
+            ctx.beginPath();
+            ctx.arc(Math.cos(a) * r, Math.sin(a) * r * 0.38, Math.max(1, 2.2 * center.scale), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        ctx.restore();
+      }
+
+      function drawScene(time) {
+        const progress = state.progress;
+        const cam = camera(progress);
+        drawBackground(progress, cam, time);
+        drawAmbientForms(progress, cam, time);
+        drawDataSlab(progress, cam, time);
+        drawAttachmentModules(progress, cam, time);
+        drawCapsule(progress, cam, time);
+        drawReceiver(progress, cam, time);
+      }
+
+      function updateDom(progress) {
+        const phase = phaseFor(progress);
+        if (phase.key !== state.lastPhase) {
+          state.lastPhase = phase.key;
+          phaseCode.textContent = phase.code;
+          phaseTitle.textContent = phase.title;
+          phaseLine.textContent = phase.line;
+          shell.className = `demo-shell state-${phase.key}${state.playing ? " is-playing" : ""}${progress > 0.08 ? " is-past-intro" : ""}${state.reducedMotion ? " reduced-motion" : ""}`;
+          phaseTicks.forEach((tick) => tick.classList.toggle("active", tick.dataset.tick === phase.key));
+          if (phase.key === "copy") showToast();
+        } else {
+          shell.classList.toggle("is-playing", state.playing);
+          shell.classList.toggle("is-past-intro", progress > 0.08);
+        }
+
+        timelineFill.style.width = `${progress * 100}%`;
+        if (Math.abs(Number(timelineInput.value) / 1000 - progress) > 0.002) {
+          timelineInput.value = Math.round(progress * 1000);
+        }
+      }
+
+      function animate(now) {
+        const delta = Math.min(48, now - state.lastTime);
+        state.lastTime = now;
+
+        if (state.playing) {
+          const speed = state.reducedMotion ? 0.00008 : 0.000055;
+          state.target = clamp(state.target + delta * speed, 0, 1);
+          if (state.target >= 1) {
+            state.playing = false;
+            playPause.textContent = "PLAY";
+          }
+        }
+
+        const follow = state.reducedMotion ? 1 : 1 - Math.pow(0.0007, delta / 16.67);
+        state.progress = mix(state.progress, state.target, follow);
+        drawScene(now);
+        updateDom(state.progress);
+
+        state.frameCount += 1;
+        if (now - state.fpsTime > 900) {
+          const fps = Math.round((state.frameCount * 1000) / (now - state.fpsTime));
+          fpsReadout.textContent = `${fps} fps scene`;
+          state.fpsTime = now;
+          state.frameCount = 0;
+        }
+
+        requestAnimationFrame(animate);
+      }
+
+      function setProgress(value) {
+        state.target = clamp(value, 0, 1);
+        if (state.reducedMotion) state.progress = state.target;
+      }
+
+      function playFrom(value) {
+        setProgress(value);
+        state.playing = true;
+        playPause.textContent = "PAUSE";
+      }
+
+      function showToast() {
+        toast.classList.add("visible");
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(() => toast.classList.remove("visible"), 1300);
+      }
+
+      window.addEventListener("resize", resize);
+
+      window.addEventListener("pointermove", (event) => {
+        state.pointerX = (event.clientX / Math.max(1, state.width) - 0.5) * 2;
+        state.pointerY = (event.clientY / Math.max(1, state.height) - 0.5) * 2;
+      });
+
+      timelineInput.addEventListener("input", (event) => {
+        state.playing = false;
+        playPause.textContent = "PLAY";
+        setProgress(Number(event.target.value) / 1000);
+      });
+
+      playPause.addEventListener("click", () => {
+        state.playing = !state.playing;
+        if (state.progress >= 0.995 && state.playing) {
+          state.target = 0;
+          state.progress = 0;
+        }
+        playPause.textContent = state.playing ? "PAUSE" : "PLAY";
+      });
+
+      restart.addEventListener("click", () => {
+        state.playing = false;
+        playPause.textContent = "PLAY";
+        state.target = 0;
+        state.progress = 0;
+      });
+
+      sendAction.addEventListener("click", () => playFrom(0.42));
+      copyAction.addEventListener("click", () => playFrom(0.84));
+
+      document.querySelectorAll("[data-jump]").forEach((button) => {
+        button.addEventListener("click", () => playFrom(Number(button.dataset.jump)));
+      });
+
+      if (state.reducedMotion) shell.classList.add("reduced-motion");
+      const params = new URLSearchParams(window.location.search);
+      const initialAt = Number(params.get("at"));
+      if (Number.isFinite(initialAt)) {
+        state.progress = clamp(initialAt, 0, 1);
+        state.target = state.progress;
+      }
+      if (params.get("autoplay") === "1") {
+        state.playing = true;
+        playPause.textContent = "PAUSE";
+      }
+      resize();
+      requestAnimationFrame(animate);
+    </script>
+  </body>
+</html>
