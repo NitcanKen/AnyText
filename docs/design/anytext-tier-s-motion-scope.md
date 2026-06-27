@@ -373,13 +373,33 @@ this list as the durable record of progress.
       "from another device" text cue.)
 
 ### Phase 2 — Hand‑feel
-- [ ] 3.5 COPY imprint: icon morph clipboard→check, lime ripple, label tint,
+- [x] 3.5 COPY imprint: icon morph clipboard→check, lime ripple, label tint,
       **zero layout shift**, optional `navigator.vibrate(8)`.
-- [ ] `magnet` hover (2–3px pull) on primary buttons.
-- [ ] `sweep` edge‑light primitive reusable.
-- [ ] `stagger` (40–80ms) on first paint and queue load.
-- [ ] Motion primitives (`charge/fire/condense/decay/imprint/sweep/magnet/stagger`)
+      (Shared `CopyButton` + `useCopyImprint` hook drive every copy surface —
+      Markdown detail, code block, pairing. `.fx-imprint` stacks idle/copied/
+      failed labels in one grid cell so width is constant — verified identical
+      across all three states in preview; `flex-shrink:0` keeps the label from
+      collapsing in tight rows. Haptic via `triggerHaptic(8)` on success.)
+- [x] `magnet` hover (2–3px pull) on primary buttons.
+      (`.fx-magnet` CSS gives a flat 2px lift; the optional `attachMagnet` helper
+      adds rAF-throttled cursor-follow on the hero Send button — written straight
+      to `--magnet-x/y` inline, never React state. Applied to Send, Copy buttons,
+      Create/Join, Choose-files. Excludes `:active`/`:disabled` so press wins.)
+- [x] `sweep` edge‑light primitive reusable.
+      (`.fx-sweep::after` travels a top border, colour via `--sweep-color`, speed
+      via `--sweep-dur`. Queue arrival composes it via JSX — lime local / cyan
+      remote — replacing the old one-off `edge-sweep`.)
+- [x] `stagger` (40–80ms) on first paint and queue load.
+      (`.fx-stagger > *` reads `--stagger-index` (set by the `staggerStyle` helper)
+      × `--stagger-step` (60ms), capped at 6. Queue rows verified at 0/60/120ms;
+      composer→queue panels first-paint at 0/60ms.)
+- [x] Motion primitives (`charge/fire/condense/decay/imprint/sweep/magnet/stagger`)
       exist as **reusable, composable, extensible** utilities — not one‑offs.
+      (Central MOTION PRIMITIVES layer in `styles.css` + `src/lib/motion.ts`
+      helpers. `charge`/`condense`/`sweep` refactored from Phase-1 one-offs into
+      shared `.fx-*` classes the SEND/queue now compose; `decay` defined and ready
+      for Phase 4; `fire` documented as the single-use `.send-*` composition.
+      Reduced-motion handled centrally in one block.)
 
 ### Phase 3 — Material layer
 - [ ] Edge light (`--edge-light`) on panels; stronger on raised/active.

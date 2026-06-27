@@ -4,7 +4,6 @@ import {
   IconChevronDown,
   IconClipboard,
   IconCloudOff,
-  IconCopy,
   IconDeviceLaptop,
   IconDownload,
   IconEdit,
@@ -33,6 +32,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { CopyButton } from './components/CopyButton';
 import { MarkdownPreview } from './components/MarkdownPreview';
 import {
   MARKDOWN_LIMIT_BYTES,
@@ -50,6 +50,7 @@ import {
 } from './lib/anytext';
 import { copyText } from './lib/clipboard';
 import { cx } from './lib/cx';
+import { attachMagnet, prefersReducedMotion, staggerStyle } from './lib/motion';
 import {
   buildJoinLink,
   clearRoomKey,
@@ -626,7 +627,7 @@ function FirstRunScreen({ onCreate, onJoin }: FirstRunScreenProps) {
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <button className="setup-action" onClick={onCreate} type="button">
+          <button className="setup-action fx-magnet" onClick={onCreate} type="button">
             <IconDeviceLaptop aria-hidden size={20} />
             <span>Create Device Circle</span>
           </button>
@@ -652,7 +653,7 @@ function FirstRunScreen({ onCreate, onJoin }: FirstRunScreenProps) {
                 spellCheck={false}
                 value={joinKey}
               />
-              <button className="icon-button px-3" type="submit">
+              <button className="icon-button fx-magnet px-3" type="submit">
                 Join
               </button>
             </div>
@@ -939,14 +940,20 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink, onCopyPair
               {formattedManualCode}
             </code>
           </div>
-          <button className="secondary-button w-full justify-center" onClick={onCopyPairingCode} type="button">
-            <IconCopy aria-hidden size={16} />
-            Copy code
-          </button>
-          <button className="secondary-button w-full justify-center" onClick={onCopyJoinLink} type="button">
-            <IconCopy aria-hidden size={16} />
-            Copy join link
-          </button>
+          <CopyButton
+            className="secondary-button fx-magnet w-full justify-center"
+            copiedLabel="Code copied"
+            idleLabel="Copy code"
+            iconSize={16}
+            onCopy={onCopyPairingCode}
+          />
+          <CopyButton
+            className="secondary-button fx-magnet w-full justify-center"
+            copiedLabel="Link copied"
+            idleLabel="Copy join link"
+            iconSize={16}
+            onCopy={onCopyJoinLink}
+          />
           <p className="truncate font-mono text-[10px] text-slate-500">{joinLink}</p>
         </div>
       </div>
@@ -990,6 +997,11 @@ function Composer({
   sendState,
 }: ComposerProps) {
   const [dragging, setDragging] = useState(false);
+  const sendButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  // `magnet` primitive (§5): the hero Send button leans toward the pointer.
+  // CSS `.fx-magnet` already gives a flat 2px lift; this adds cursor-follow.
+  useEffect(() => attachMagnet(sendButtonRef.current), []);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -1011,9 +1023,9 @@ function Composer({
       </div>
 
       <div
-        className={cx('composer-body', charging && 'composer-charging')}
+        className={cx('composer-body', charging && 'fx-charge')}
         onAnimationEnd={(event) => {
-          if (event.animationName === 'composer-charge') {
+          if (event.animationName === 'fx-charge') {
             onChargeEnd();
           }
         }}
@@ -1074,7 +1086,7 @@ function Composer({
             </p>
             <p className="text-xs text-slate-500">Up to 10 files, 25MB each. Images preview; documents download.</p>
           </div>
-          <button className="secondary-button shrink-0" onClick={() => fileInputRef.current?.click()} type="button">
+          <button className="secondary-button fx-magnet shrink-0" onClick={() => fileInputRef.current?.click()} type="button">
             Select
           </button>
         </div>
@@ -1099,12 +1111,13 @@ function Composer({
           {sendState === 'failed' ? <InlineAlert message={backendError || 'Send failed. Retry after refreshing sync.'} /> : null}
           <button
             className={cx(
-              'send-button',
+              'send-button fx-magnet',
               !sendDisabled && sendState === 'draft_ready' && 'send-button-ready',
               sendState === 'sent' && 'send-button-sent',
             )}
             disabled={sendDisabled}
             onClick={onSend}
+            ref={sendButtonRef}
             type="button"
           >
             {BUSY_SEND_STATES.has(sendState) ? (
@@ -1344,9 +1357,10 @@ function QueuePanel({
           {queueStatus === 'error' ? <QueueError onRefresh={onRefresh} /> : null}
           {queueStatus === 'idle' && activeItems.length === 0 ? <EmptyQueue /> : null}
           {queueStatus === 'idle' && activeItems.length > 0 ? (
-            <div className="queue-list-scroll">
-              {activeItems.map((item) => (
+            <div className="queue-list-scroll fx-stagger">
+              {activeItems.map((item, index) => (
                 <QueueRow
+                  index={index}
                   item={item}
                   key={item.id}
                   now={now}
@@ -1439,6 +1453,7 @@ function EmptyQueue() {
 }
 
 interface QueueRowProps {
+  index: number;
   item: QueueItem;
   now: Date;
   onDelete: (id: string) => void;
@@ -1447,14 +1462,18 @@ interface QueueRowProps {
   selected: boolean;
 }
 
-function QueueRow({ item, now, onDelete, onSelect, origin, selected }: QueueRowProps) {
+function QueueRow({ index, item, now, onDelete, onSelect, origin, selected }: QueueRowProps) {
   const title = getQueueItemTitle(item);
   const attachmentSummary = getAttachmentSummary(item.attachments);
   const imageCount = item.attachments.filter((attachment) => attachment.previewKind === 'image').length;
   const fileCount = item.attachments.length - imageCount;
 
   return (
-    <div className={cx('queue-row-group', selected && 'queue-row-selected')} data-origin={origin}>
+    <div
+      className={cx('queue-row-group', origin && 'fx-condense fx-sweep', selected && 'queue-row-selected')}
+      data-origin={origin}
+      style={staggerStyle(index)}
+    >
       <button className="queue-row" onClick={() => onSelect(item.id)} title="Open queue item" type="button">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -1519,28 +1538,14 @@ interface MessageDetailProps {
 }
 
 function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, onDeleteMessage, onImagePreview }: MessageDetailProps) {
-  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const attachmentDockRef = useRef<HTMLDivElement | null>(null);
   const attachmentDockId = `attachments-${item.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
   const timeState = getItemTimeState(item.expiresAt, now);
   const isExpired = expired || timeState.expired;
 
-  async function copyMarkdown() {
-    try {
-      await onCopyMarkdown(item.markdown);
-      setCopyState('copied');
-    } catch {
-      setCopyState('failed');
-    } finally {
-      window.setTimeout(() => setCopyState('idle'), 1200);
-    }
-  }
-
   function focusAttachmentDock() {
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-
     attachmentDockRef.current?.scrollIntoView?.({
-      behavior: reduceMotion ? 'auto' : 'smooth',
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
       block: 'nearest',
     });
     attachmentDockRef.current?.focus({ preventScroll: true });
@@ -1568,10 +1573,12 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
               {item.attachments.length === 1 ? '1 attachment' : `${item.attachments.length} attachments`}
             </button>
           ) : null}
-          <button className="secondary-button" onClick={copyMarkdown} type="button">
-            {copyState === 'copied' ? <IconCheck aria-hidden size={15} /> : <IconCopy aria-hidden size={15} />}
-            {copyState === 'copied' ? 'Markdown copied' : copyState === 'failed' ? 'Copy failed' : 'Copy Markdown'}
-          </button>
+          <CopyButton
+            className="secondary-button fx-magnet"
+            copiedLabel="Markdown copied"
+            idleLabel="Copy Markdown"
+            onCopy={() => onCopyMarkdown(item.markdown)}
+          />
           <button className="danger-button" onClick={() => onDeleteMessage(item.id)} type="button">
             <IconTrash aria-hidden size={15} />
             Delete message

@@ -1193,6 +1193,9 @@ a:focus-visible {
   --ease-emphasis: cubic-bezier(0.2, 0.8, 0.2, 1); /* decisive, snappy in */
   --ease-decay: cubic-bezier(0.4, 0, 0.85, 0.35); /* exits / dissolve */
 
+  /* stagger primitive step — siblings sequence 40–80ms apart (§5) */
+  --stagger-step: 60ms;
+
   /* Energy ramps for the fire→condense beam (§2). NOTE: doc literal
      `#eaffb9a` is invalid CSS (7 hex digits) — corrected to a valid hot lime. */
   --beam-core: #eaffb9; /* hot center of the send beam */
@@ -1406,8 +1409,9 @@ textarea:focus-visible {
   animation: panel-rise 600ms var(--ease-out-soft) both;
 }
 
+/* first-paint stagger: the queue panel trails the composer by one step (§5) */
 .queue-panel {
-  animation: panel-rise 600ms var(--ease-out-soft) 90ms both;
+  animation: panel-rise 600ms var(--ease-out-soft) var(--stagger-step) both;
 }
 
 .pairing-card {
@@ -1707,28 +1711,13 @@ textarea:focus-visible {
 /* blur). All reduced-motion-guarded below.                      */
 /* ============================================================= */
 
-/* ---- THE SEND · charge (composer content inhales toward Send) ---- */
+/* ---- THE SEND · charge (composer content inhales toward Send) ----
+   The motion is the reusable `.fx-charge` primitive (see MOTION PRIMITIVES);
+   here we only set the composer-specific inhale direction + the signature-tier
+   duration so THE SEND keeps its ~190ms charge beat. */
 .composer-body {
   transform-origin: 50% 100%;
-}
-
-.composer-charging {
-  animation: composer-charge calc(var(--dur-signature-eff) * 0.19) var(--ease-emphasis) both;
-}
-
-@keyframes composer-charge {
-  0% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
-  55% {
-    transform: scale(0.985);
-    filter: brightness(0.9);
-  }
-  100% {
-    transform: scale(1);
-    filter: brightness(1);
-  }
+  --charge-dur: calc(var(--dur-signature-eff) * 0.19);
 }
 
 /* ---- THE SEND · fire (literal travelling beam, Composer → Queue) ---- */
@@ -1879,60 +1868,19 @@ textarea:focus-visible {
   }
 }
 
-/* ---- QUEUE ARRIVAL · condense + origin sweep (§3.2) ---- */
+/* ---- QUEUE ARRIVAL · origin colour for the condense + sweep primitives (§3.2).
+   The motion itself is the reusable `.fx-condense` + `.fx-sweep` primitives
+   (see MOTION PRIMITIVES), composed onto the row group in JSX when an arrival
+   origin is known. This rule only supplies the per-origin colour + the
+   signature-tier durations so queue arrival keeps its cinematic envelope. ---- */
 .queue-row-group[data-origin] {
   --sweep-color: var(--accent);
-  animation: queue-condense calc(var(--dur-signature-eff) * 0.48) var(--ease-spring) both;
+  --sweep-dur: calc(var(--dur-signature-eff) * 0.6);
+  --condense-dur: calc(var(--dur-signature-eff) * 0.48);
 }
 
 .queue-row-group[data-origin='remote'] {
   --sweep-color: var(--accent-cyan);
-}
-
-@keyframes queue-condense {
-  0% {
-    opacity: 0;
-    transform: scale(0.96) translateY(6px);
-    filter: blur(8px);
-  }
-  55% {
-    opacity: 1;
-    filter: blur(0);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-    filter: blur(0);
-  }
-}
-
-.queue-row-group[data-origin]::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--sweep-color), transparent);
-  opacity: 0.9;
-  transform: translateX(-100%);
-  animation: edge-sweep calc(var(--dur-signature-eff) * 0.6) var(--ease-out-soft) both;
-  pointer-events: none;
-}
-
-@keyframes edge-sweep {
-  0% {
-    opacity: 0;
-    transform: translateX(-100%);
-  }
-  15% {
-    opacity: 0.95;
-  }
-  100% {
-    opacity: 0;
-    transform: translateX(100%);
-  }
 }
 
 /* remote arrival · "from another device" cyan cue (color + text), fades ~2.4s */
@@ -1977,6 +1925,235 @@ textarea:focus-visible {
   }
 }
 
+/* ============================================================= */
+/* MOTION PRIMITIVES — the reusable choreography vocabulary (§5)  */
+/* Composable utility classes, tuned via CSS custom properties.   */
+/* Apply by className; layer freely. Everyday tier = imprint /     */
+/* sweep / magnet / stagger (120–180ms, snappy). Signature tier =  */
+/* charge / condense / decay (cinematic, the 5 moments only). The  */
+/* `fire` primitive is composed from the `.send-*` building blocks  */
+/* above (beam streak + shockwave + core flash) — single-use by    */
+/* design (§5). Reduced-motion is handled centrally in the single  */
+/* `prefers-reduced-motion` block below — never per primitive.     */
+/* ============================================================= */
+
+/* ---- charge · element compresses + dims, as if inhaled (§5) ----
+   Generic default = --dur-tap; signature surfaces raise --charge-dur. */
+.fx-charge {
+  animation: fx-charge var(--charge-dur, var(--dur-tap)) var(--ease-emphasis) both;
+}
+
+@keyframes fx-charge {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  55% {
+    transform: scale(0.985);
+    filter: brightness(0.9);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+/* ---- condense · materialise in from a blurred, scaled smear (§5) ----
+   Signature primitive (queue arrival). Default = --dur-expand. */
+.fx-condense {
+  animation: fx-condense var(--condense-dur, var(--dur-expand)) var(--ease-spring) both;
+}
+
+@keyframes fx-condense {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+    filter: blur(8px);
+  }
+  55% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+/* ---- decay · fray + drift + fade out (§5) ----
+   Signature primitive, ready for EXPIRY (§3.4 / Phase 4). Default
+   = --dur-signature; --ease-decay. Layout-safe (transform/opacity only). */
+.fx-decay {
+  animation: fx-decay var(--decay-dur, var(--dur-signature)) var(--ease-decay) both;
+}
+
+@keyframes fx-decay {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+}
+
+/* ---- sweep · one-shot edge light travelling a border (§5) ----
+   Reusable: colour via --sweep-color (lime local / cyan remote), speed via
+   --sweep-dur, thickness via --sweep-thickness. Used by queue arrival. */
+.fx-sweep {
+  position: relative;
+}
+
+.fx-sweep::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: var(--sweep-thickness, 2px);
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--sweep-color, var(--accent)), transparent);
+  opacity: 0;
+  transform: translateX(-100%);
+  animation: fx-sweep var(--sweep-dur, 600ms) var(--ease-out-soft) both;
+  pointer-events: none;
+}
+
+@keyframes fx-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  15% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* ---- magnet · hover pull 2–3px toward the cursor (§5) ----
+   CSS default = a flat 2px lift; the optional `attachMagnet` helper writes
+   --magnet-x/--magnet-y for true cursor-follow. Excludes :active/:disabled so
+   the press-down (scale) still wins; transform/opacity only. */
+.fx-magnet {
+  transition: transform var(--dur-tap) var(--ease-out-soft);
+}
+
+.fx-magnet:hover:not(:disabled):not(:active) {
+  transform: translate3d(var(--magnet-x, 0px), var(--magnet-y, -2px), 0);
+}
+
+/* ---- stagger · sequence siblings 40–80ms apart (§5) ----
+   Container utility: each direct child's entrance is offset by its
+   --stagger-index (set inline via the `staggerStyle` helper) × --stagger-step,
+   capped by --stagger-cap so long lists never lag. */
+.fx-stagger > * {
+  animation-delay: calc(min(var(--stagger-index, 0), var(--stagger-cap, 6)) * var(--stagger-step, 60ms));
+}
+
+/* ---- imprint · copy hand-feel: icon morph + ripple + label tint (§3.5) ----
+   Everyday tier (--dur-feedback, snappy). Labels stack in one grid cell so the
+   width never changes — zero layout shift. Used by every CopyButton. */
+.fx-imprint {
+  position: relative;
+  overflow: hidden;
+  /* Keep the reserved-width label intact in tight flex rows: overflow:hidden
+     would otherwise let the button shrink below its content (collapsing the
+     label). Hold content width; let neighbours (e.g. the language tag) shrink. */
+  flex-shrink: 0;
+}
+
+.fx-imprint-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 50%, rgba(190, 252, 60, 0.5), transparent 62%);
+  opacity: 0;
+  transform: scale(0.3);
+  pointer-events: none;
+  animation: fx-imprint-ripple var(--dur-feedback) var(--ease-emphasis) both;
+}
+
+@keyframes fx-imprint-ripple {
+  0% {
+    opacity: 0.6;
+    transform: scale(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+.fx-imprint-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+
+.fx-imprint-icon > * {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--dur-feedback) var(--ease-emphasis),
+    transform var(--dur-feedback) var(--ease-emphasis);
+}
+
+.fx-imprint-check {
+  opacity: 0;
+  transform: scale(0.4) rotate(-16deg);
+}
+
+[data-copy-state="copied"] .fx-imprint-copy {
+  opacity: 0;
+  transform: scale(0.4) rotate(16deg);
+}
+
+[data-copy-state="copied"] .fx-imprint-check {
+  opacity: 1;
+  transform: none;
+}
+
+.fx-imprint-label {
+  display: inline-grid;
+  align-items: center;
+}
+
+.fx-imprint-text {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+  transition: opacity var(--dur-feedback) var(--ease-emphasis);
+}
+
+.fx-imprint-text[data-imprint="copied"],
+.fx-imprint-text[data-imprint="failed"] {
+  opacity: 0;
+}
+
+.fx-imprint-text[data-imprint="copied"] {
+  color: var(--accent);
+}
+
+.fx-imprint-text[data-imprint="failed"] {
+  color: #fca5a5;
+}
+
+[data-copy-state="copied"] .fx-imprint-text[data-imprint="idle"],
+[data-copy-state="failed"] .fx-imprint-text[data-imprint="idle"] {
+  opacity: 0;
+}
+
+[data-copy-state="copied"] .fx-imprint-text[data-imprint="copied"] {
+  opacity: 1;
+}
+
+[data-copy-state="failed"] .fx-imprint-text[data-imprint="failed"] {
+  opacity: 1;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -2004,5 +2181,17 @@ textarea:focus-visible {
   .arrival-remote {
     animation: none !important;
     opacity: 1 !important;
+  }
+
+  /* MOTION PRIMITIVES · COPY imprint = instant icon/label swap, no ripple
+     (§3.5 fallback). The icon morph + label tint already collapse to instant
+     via the global transition-duration override above. */
+  .fx-imprint-ripple {
+    display: none !important;
+  }
+
+  /* magnet = no positional pull; the border/background hover still confirms. */
+  .fx-magnet:hover:not(:active) {
+    transform: none !important;
   }
 }
