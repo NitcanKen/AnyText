@@ -201,6 +201,7 @@ a:focus-visible {
   }
 
   .composer-send-area {
+    position: relative;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     padding-top: 0.75rem;
   }
@@ -1179,6 +1180,23 @@ a:focus-visible {
   --accent-cyan: #7dd3fc;
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Motion durations — named, not magic numbers (Tier-S §2) */
+  --dur-tap: 120ms; /* button press / instant feedback */
+  --dur-feedback: 180ms; /* copy check, small state changes */
+  --dur-expand: 240ms; /* expand / collapse / detail open */
+  --dur-transition: 280ms; /* sheet / tab / page transitions */
+  --dur-signature: 620ms; /* the 5 signature moments only */
+  --dur-signature-eff: 1000ms; /* cinematic ×1.6 envelope for signature moments (§2.5) */
+
+  /* Easing additions (§2) */
+  --ease-emphasis: cubic-bezier(0.2, 0.8, 0.2, 1); /* decisive, snappy in */
+  --ease-decay: cubic-bezier(0.4, 0, 0.85, 0.35); /* exits / dissolve */
+
+  /* Energy ramps for the fire→condense beam (§2). NOTE: doc literal
+     `#eaffb9a` is invalid CSS (7 hex digits) — corrected to a valid hot lime. */
+  --beam-core: #eaffb9; /* hot center of the send beam */
+  --beam-edge: rgba(190, 252, 60, 0); /* transparent lime tail */
 }
 
 /* --- Global texture: selection + buttery custom scrollbars --- */
@@ -1681,6 +1699,284 @@ textarea:focus-visible {
   background-size: 100% 1px;
 }
 
+/* ============================================================= */
+/* SIGNATURE MOMENTS — Relay Axis (Tier-S §3.1 / §3.2)           */
+/* THE SEND: charge → fire (L→R beam) → condense.                */
+/* GPU-only: transform / opacity primary; brief filter only on   */
+/* the two doc-mandated signature beats (charge dip, condense     */
+/* blur). All reduced-motion-guarded below.                      */
+/* ============================================================= */
+
+/* ---- THE SEND · charge (composer content inhales toward Send) ---- */
+.composer-body {
+  transform-origin: 50% 100%;
+}
+
+.composer-charging {
+  animation: composer-charge calc(var(--dur-signature-eff) * 0.19) var(--ease-emphasis) both;
+}
+
+@keyframes composer-charge {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  55% {
+    transform: scale(0.985);
+    filter: brightness(0.9);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+/* ---- THE SEND · fire (literal travelling beam, Composer → Queue) ---- */
+.send-beam-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.send-beam {
+  position: absolute;
+  top: 38%;
+  left: 0;
+  width: 42vw;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--beam-edge), var(--beam-core) 50%, var(--beam-edge));
+  opacity: 0;
+  transform: translateX(-60vw) scaleX(0.6);
+  will-change: transform, opacity;
+  animation: send-beam-fire var(--dur-signature-eff) var(--ease-out-soft) both;
+}
+
+/* charge hold 0–190ms · fire 190–520ms (L→R) · fade into condense 520–1000ms */
+@keyframes send-beam-fire {
+  0% {
+    opacity: 0;
+    transform: translateX(-60vw) scaleX(0.55);
+  }
+  19% {
+    opacity: 0;
+    transform: translateX(-58vw) scaleX(0.6);
+  }
+  30% {
+    opacity: 0.5;
+    transform: translateX(-24vw) scaleX(1);
+  }
+  52% {
+    opacity: 0.5;
+    transform: translateX(80vw) scaleX(1.12);
+  }
+  72% {
+    opacity: 0;
+    transform: translateX(118vw) scaleX(0.9);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(122vw) scaleX(0.8);
+  }
+}
+
+/* fail-state · beam recoils back toward the Send button (red, quick) */
+.send-beam-recoil {
+  top: 46%;
+  background: linear-gradient(90deg, rgba(248, 113, 113, 0), #fca5a5 50%, rgba(248, 113, 113, 0));
+  animation: send-beam-recoil calc(var(--dur-signature-eff) * 0.42) var(--ease-emphasis) both;
+}
+
+@keyframes send-beam-recoil {
+  0% {
+    opacity: 0.55;
+    transform: translateX(80vw) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-40vw) scaleX(0.5);
+  }
+}
+
+/* ---- THE SEND · shockwave ring + core flash on the Send button ---- */
+.send-fire-fx,
+.send-fail-flash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 44px;
+  pointer-events: none;
+}
+
+.send-core-flash {
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: radial-gradient(circle at center, var(--beam-core), transparent 65%);
+  opacity: 0;
+  animation: send-core-flash calc(var(--dur-signature-eff) * 0.52) var(--ease-out-soft) both;
+}
+
+@keyframes send-core-flash {
+  0% {
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.send-shockwave {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  width: 44px;
+  height: 44px;
+  margin: -22px 0 0 -22px;
+  border-radius: 999px;
+  border: 2px solid var(--beam-core);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: send-shockwave calc(var(--dur-signature-eff) * 0.55) var(--ease-out-soft) both;
+}
+
+@keyframes send-shockwave {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  18% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+.send-fail-flash {
+  border-radius: 8px;
+  background: radial-gradient(circle at center, rgba(248, 113, 113, 0.85), transparent 68%);
+  opacity: 0;
+  animation: send-fail-flash calc(var(--dur-signature-eff) * 0.48) var(--ease-emphasis) both;
+}
+
+@keyframes send-fail-flash {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  45% {
+    opacity: 0.9;
+  }
+}
+
+/* ---- QUEUE ARRIVAL · condense + origin sweep (§3.2) ---- */
+.queue-row-group[data-origin] {
+  --sweep-color: var(--accent);
+  animation: queue-condense calc(var(--dur-signature-eff) * 0.48) var(--ease-spring) both;
+}
+
+.queue-row-group[data-origin='remote'] {
+  --sweep-color: var(--accent-cyan);
+}
+
+@keyframes queue-condense {
+  0% {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+    filter: blur(8px);
+  }
+  55% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0);
+  }
+}
+
+.queue-row-group[data-origin]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--sweep-color), transparent);
+  opacity: 0.9;
+  transform: translateX(-100%);
+  animation: edge-sweep calc(var(--dur-signature-eff) * 0.6) var(--ease-out-soft) both;
+  pointer-events: none;
+}
+
+@keyframes edge-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  15% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+/* remote arrival · "from another device" cyan cue (color + text), fades ~2.4s */
+.arrival-remote {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.3rem;
+  color: var(--accent-cyan);
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    "Liberation Mono",
+    monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: arrival-fade 2.4s var(--ease-out-soft) both;
+}
+
+.arrival-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px rgba(125, 211, 252, 0.7);
+}
+
+@keyframes arrival-fade {
+  0%,
+  68% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1693,5 +1989,20 @@ textarea:focus-visible {
 
   .ambient-field {
     display: none;
+  }
+
+  /* THE SEND · no beam / shockwave / flash under reduced motion (§3.1 fallback).
+     The Send button's existing check-state remains the confirmation. */
+  .send-beam-layer,
+  .send-fire-fx,
+  .send-fail-flash {
+    display: none !important;
+  }
+
+  /* QUEUE ARRIVAL · opacity-only fallback; keep the persistent remote cue
+     (cyan dot + text) so local-vs-remote stays distinguishable (§3.2 / §8). */
+  .arrival-remote {
+    animation: none !important;
+    opacity: 1 !important;
   }
 }

@@ -90,6 +90,8 @@ const BUSY_SEND_STATES = new Set<SendState>(['validating', 'uploading', 'publish
 type QueueStatus = 'idle' | 'loading' | 'error';
 type MobileTab = 'send' | 'queue';
 type SyncStatus = 'connecting' | RealtimeStatus;
+type ArrivalOrigin = 'local' | 'remote';
+type SendFx = { id: number; phase: 'fire' | 'recoil' };
 const DELETE_CONFIRMATION_STORAGE_KEY = 'anytext.confirmDeleteMessage';
 
 function App() {
@@ -113,13 +115,29 @@ function App() {
   const [now, setNow] = useState(() => new Date());
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
   const [backendError, setBackendError] = useState('');
+  const [sendFx, setSendFx] = useState<SendFx | null>(null);
+  const [charging, setCharging] = useState(false);
+  const [arrivals, setArrivals] = useState<Record<string, ArrivalOrigin>>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const sendFxIdRef = useRef(0);
+  const seenIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
 
     return () => window.clearInterval(timer);
   }, []);
+
+  function markSeen(items: QueueItem[]) {
+    for (const item of items) {
+      seenIdsRef.current.add(item.id);
+    }
+  }
+
+  function triggerSendFx(phase: SendFx['phase']) {
+    sendFxIdRef.current += 1;
+    setSendFx({ id: sendFxIdRef.current, phase });
+  }
 
   useEffect(() => {
     if (!roomKey) {
@@ -150,6 +168,8 @@ function App() {
           return;
         }
 
+        // Items present at connect are historical, not arrivals — mark them seen.
+        markSeen(items);
         setRoomId(room.roomId);
         setQueueItems(items);
         setSelectedId((current) => current ?? items[0]?.id ?? null);
@@ -161,6 +181,19 @@ function App() {
               void loadQueueWithAttachmentUrls(client, roomKey)
                 .then((freshItems) => {
                   if (!cancelled) {
+                    // Any id we have not seen before arrived from another device.
+                    const remoteIds = freshItems.filter((item) => !seenIdsRef.current.has(item.id)).map((item) => item.id);
+                    const freshIds = new Set(freshItems.map((item) => item.id));
+                    markSeen(freshItems);
+
+                    setArrivals((prev) => {
+                      const next = pruneArrivals(prev, freshIds);
+                      for (const id of remoteIds) {
+                        next[id] = 'remote';
+                      }
+                      return next;
+                    });
+
                     setQueueItems(freshItems);
                     setSelectedId((current) =>
                       current && freshItems.some((item) => item.id === current) ? current : freshItems[0]?.id ?? null,
@@ -302,6 +335,10 @@ function App() {
       return;
     }
 
+    // Fire THE SEND immediately on commit — celebratory, non-blocking; the ~1s
+    // envelope never gates the actual relay (§2.5).
+    triggerSendFx('fire');
+    setCharging(true);
     setSendState('validating');
 
     try {
@@ -321,6 +358,10 @@ function App() {
       );
       const itemWithUrls = await hydrateQueueItemAttachmentUrls(client, roomKey, item);
 
+      // Tag as a local arrival (lime) and mark seen so the realtime echo of our
+      // own insert is not re-classified as remote.
+      seenIdsRef.current.add(itemWithUrls.id);
+      setArrivals((prev) => ({ ...prev, [itemWithUrls.id]: 'local' }));
       setQueueItems((items) =>
         getActiveQueueItems([itemWithUrls, ...items.filter((existingItem) => existingItem.id !== itemWithUrls.id)]),
       );
@@ -337,6 +378,9 @@ function App() {
       setActiveTab('queue');
       window.setTimeout(() => setSendState('draft_empty'), 1200);
     } catch (error) {
+      // Fail-state: beam recoils + button danger pulse once. Content is never
+      // cleared (the clear only runs in the success branch above).
+      triggerSendFx('recoil');
       setBackendError(getErrorMessage(error));
       setSendState('failed');
     }
@@ -362,6 +406,7 @@ function App() {
     try {
       await deleteSupabaseMessage(getSupabaseClient(), roomKey, id);
       setQueueItems((items) => items.filter((item) => item.id !== id));
+      setArrivals((prev) => (id in prev ? pruneArrivals(prev, new Set(Object.keys(prev).filter((key) => key !== id))) : prev));
       setSelectedId(null);
       setPendingDeleteId(null);
     } catch (error) {
@@ -388,6 +433,9 @@ function App() {
 
     try {
       const items = await loadQueueWithAttachmentUrls(getSupabaseClient(), roomKey);
+      const liveIds = new Set(items.map((item) => item.id));
+      markSeen(items);
+      setArrivals((prev) => pruneArrivals(prev, liveIds));
       setQueueItems(items);
       setSelectedId((current) => (current && items.some((item) => item.id === current) ? current : items[0]?.id ?? null));
       setQueueStatus('idle');
@@ -435,6 +483,7 @@ function App() {
   return (
     <div className="app-shell bg-[#070a0c] text-slate-100">
       <AmbientField />
+      <SendBeam fx={sendFx} />
       <TopBar
         deleteConfirmationEnabled={deleteConfirmationEnabled}
         deviceName={deviceName}
@@ -499,10 +548,12 @@ function App() {
               attachmentErrors={attachmentErrors}
               attachments={attachments}
               backendError={backendError}
+              charging={charging}
               fileInputRef={fileInputRef}
               markdown={markdown}
               markdownValidation={markdownValidation}
               onAddFiles={addFiles}
+              onChargeEnd={() => setCharging(false)}
               onMarkdownChange={(value) => {
                 setMarkdown(value);
                 resetSendStateForDraft(value, attachments);
@@ -510,6 +561,7 @@ function App() {
               onRemoveAttachment={removeAttachment}
               onSend={sendMessage}
               sendDisabled={sendDisabled}
+              sendFx={sendFx}
               sendState={visibleSendState}
             />
           </section>
@@ -517,6 +569,7 @@ function App() {
           <section className={cx('workspace-pane md:block', activeTab === 'queue' ? 'block' : 'hidden md:block')}>
             <QueuePanel
               activeItems={activeItems}
+              arrivals={arrivals}
               backendError={backendError}
               now={now}
               onCopyMarkdown={copyMarkdown}
@@ -905,14 +958,17 @@ interface ComposerProps {
   attachmentErrors: string[];
   attachments: SelectedAttachment[];
   backendError: string;
+  charging: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
   markdown: string;
   markdownValidation: { valid: boolean; bytes: number; message?: string };
   onAddFiles: (files: File[]) => void;
+  onChargeEnd: () => void;
   onMarkdownChange: (value: string) => void;
   onRemoveAttachment: (id: string) => void;
   onSend: () => void;
   sendDisabled: boolean;
+  sendFx: SendFx | null;
   sendState: SendState;
 }
 
@@ -920,14 +976,17 @@ function Composer({
   attachmentErrors,
   attachments,
   backendError,
+  charging,
   fileInputRef,
   markdown,
   markdownValidation,
   onAddFiles,
+  onChargeEnd,
   onMarkdownChange,
   onRemoveAttachment,
   onSend,
   sendDisabled,
+  sendFx,
   sendState,
 }: ComposerProps) {
   const [dragging, setDragging] = useState(false);
@@ -951,7 +1010,14 @@ function Composer({
         </div>
       </div>
 
-      <div className="composer-body">
+      <div
+        className={cx('composer-body', charging && 'composer-charging')}
+        onAnimationEnd={(event) => {
+          if (event.animationName === 'composer-charge') {
+            onChargeEnd();
+          }
+        }}
+      >
         <label className="sr-only" htmlFor="markdown-input">
           Markdown input
         </label>
@@ -1020,6 +1086,15 @@ function Composer({
         <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />
 
         <div className="composer-send-area">
+          {sendFx?.phase === 'fire' ? (
+            <span key={sendFx.id} className="send-fire-fx" aria-hidden="true">
+              <span className="send-core-flash" />
+              <span className="send-shockwave" />
+            </span>
+          ) : null}
+          {sendFx?.phase === 'recoil' ? (
+            <span key={`fail-${sendFx.id}`} className="send-fail-flash" aria-hidden="true" />
+          ) : null}
           <SendProgress sendState={sendState} attachmentCount={attachments.length} />
           {sendState === 'failed' ? <InlineAlert message={backendError || 'Send failed. Retry after refreshing sync.'} /> : null}
           <button
@@ -1185,6 +1260,7 @@ function canRemoveAttachment(attachment: SelectedAttachment): boolean {
 
 interface QueuePanelProps {
   activeItems: QueueItem[];
+  arrivals: Record<string, ArrivalOrigin>;
   backendError: string;
   now: Date;
   onCopyMarkdown: (markdown: string) => Promise<void>;
@@ -1201,6 +1277,7 @@ interface QueuePanelProps {
 
 function QueuePanel({
   activeItems,
+  arrivals,
   backendError,
   now,
   onCopyMarkdown,
@@ -1275,6 +1352,7 @@ function QueuePanel({
                   now={now}
                   onDelete={deleteMessage}
                   onSelect={selectItem}
+                  origin={arrivals[item.id]}
                   selected={selectedItem?.id === item.id}
                 />
               ))}
@@ -1365,17 +1443,18 @@ interface QueueRowProps {
   now: Date;
   onDelete: (id: string) => void;
   onSelect: (id: string) => void;
+  origin?: ArrivalOrigin;
   selected: boolean;
 }
 
-function QueueRow({ item, now, onDelete, onSelect, selected }: QueueRowProps) {
+function QueueRow({ item, now, onDelete, onSelect, origin, selected }: QueueRowProps) {
   const title = getQueueItemTitle(item);
   const attachmentSummary = getAttachmentSummary(item.attachments);
   const imageCount = item.attachments.filter((attachment) => attachment.previewKind === 'image').length;
   const fileCount = item.attachments.length - imageCount;
 
   return (
-    <div className={cx('queue-row-group', selected && 'queue-row-selected')}>
+    <div className={cx('queue-row-group', selected && 'queue-row-selected')} data-origin={origin}>
       <button className="queue-row" onClick={() => onSelect(item.id)} title="Open queue item" type="button">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -1384,6 +1463,12 @@ function QueueRow({ item, now, onDelete, onSelect, selected }: QueueRowProps) {
               {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
               {attachmentSummary ? ` · ${attachmentSummary}` : ''}
             </p>
+            {origin === 'remote' ? (
+              <span className="arrival-remote" aria-label="Arrived from another device">
+                <span className="arrival-dot" aria-hidden="true" />
+                from another device
+              </span>
+            ) : null}
           </div>
           {item.attachments.length > 0 ? (
             <div
@@ -1826,6 +1911,21 @@ function AmbientField() {
   );
 }
 
+// THE SEND — the literal travelling beam that sweeps Composer (left) → Queue
+// (right). Keyed by fx.id so each send remounts the streak and replays the CSS;
+// decorative, so aria-hidden and pointer-events:none.
+function SendBeam({ fx }: { fx: SendFx | null }) {
+  if (!fx) {
+    return null;
+  }
+
+  return (
+    <div className="send-beam-layer" aria-hidden="true">
+      <span key={fx.id} className={cx('send-beam', fx.phase === 'recoil' && 'send-beam-recoil')} />
+    </div>
+  );
+}
+
 function InlineAlert({ message }: { message: string }) {
   return (
     <div className="inline-alert">
@@ -1945,6 +2045,19 @@ function syncStatusLabel(status: SyncStatus): string {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Supabase relay request failed.';
+}
+
+// Keep the arrival-origin map bounded to ids still present in the queue.
+function pruneArrivals(arrivals: Record<string, ArrivalOrigin>, liveIds: Set<string>): Record<string, ArrivalOrigin> {
+  const next: Record<string, ArrivalOrigin> = {};
+
+  for (const [id, origin] of Object.entries(arrivals)) {
+    if (liveIds.has(id)) {
+      next[id] = origin;
+    }
+  }
+
+  return next;
 }
 
 function getInitialDeleteConfirmationEnabled(): boolean {
