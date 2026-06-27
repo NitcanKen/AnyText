@@ -432,11 +432,37 @@ this list as the durable record of progress.
       whole field is `display:none`.)
 
 ### Phase 4 — Emotional peaks
-- [ ] 3.3 PAIRING: QR dissolves into particles → re‑forms as live sync dot.
-- [ ] 3.4 EXPIRY: last‑60s edge dim‑pulse + amber time badge → disintegrate
+- [x] 3.3 PAIRING: QR dissolves into particles → re‑forms as live sync dot.
+      (`PairingCard` gains a `linked` state; the `.qr-placeholder` dissolves
+      (`pairing-qr-out`) while `ParticleBurst direction="converge"` flies inward
+      and re‑forms the existing `.sync-dot[data-status="connected"]` + a one‑shot
+      `.pairing-ring`; heading shifts "Pairing QR visible" → "Linked". Triggered
+      both manually ("We're linked" button) and automatically when a remote
+      arrival proves a second device is live while the card is open
+      (`remoteArrivalSignal`, presentation‑only — no pairing data logic changed).
+      Reduced motion → crossfade, no particles. Verified in preview.)
+- [x] 3.4 EXPIRY: last‑60s edge dim‑pulse + amber time badge → disintegrate
       particles, drift, layout‑safe height collapse.
-- [ ] Reusable, capped (≤24), reduced‑motion‑aware **particle utility** shared by
+      (QueueRow sets `data-approaching` when `remainingMs ≤ 60s`: a decorative
+      `.queue-edge` opacity dim‑pulse + the `.queue-time` badge shifts to
+      `--warning` amber. On expiry, `useExpiryDecay` detects rows that left
+      `activeItems` because they expired — not deleted — and renders an
+      `aria-hidden`, non‑interactive `ExpiryGhost` in the row's measured place:
+      `ParticleBurst direction="scatter"` (rise) + a fading shape
+      (transform/opacity), then the single layout‑safe `height`+`margin` collapse
+      §3.4 sanctions. No reflow jump; the expired row leaves the a11y tree
+      immediately. Reduced motion → fade + instant collapse, no particles.)
+- [x] Reusable, capped (≤24), reduced‑motion‑aware **particle utility** shared by
       3.3 and 3.4.
+      (`<ParticleBurst>` in `src/components/ParticleBurst.tsx` — `aria-hidden`,
+      pure transform/opacity spans, `scatter`/`converge` directions, props
+      `count`/`spread`/`rise`/`color`/`durationMs`/`burstKey`. Count clamped by
+      the central `particleBudget()` in `src/lib/motion.ts` (hard cap
+      `PARTICLE_MAX = 24`), which returns 0 — render nothing — under reduced
+      motion or a low‑power device (deviceMemory ≤2 / hardwareConcurrency ≤2 /
+      Save‑Data / low‑uncharging Battery). Verified in preview: 20‑particle
+      burst capped, and particles gated to 0 independently under both
+      reduced‑motion and a faked low‑memory hint.)
 
 ### Phase 5 — Typography & QA gate
 - [ ] Telemetry numerals (tabular) for countdown, file sizes, progress %.

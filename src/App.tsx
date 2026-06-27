@@ -22,18 +22,21 @@ import {
 } from '@tabler/icons-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
+  type CSSProperties,
   type ChangeEvent,
   type DragEvent,
   type KeyboardEvent,
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import { CopyButton } from './components/CopyButton';
 import { MarkdownPreview } from './components/MarkdownPreview';
+import { ParticleBurst } from './components/ParticleBurst';
 import {
   MARKDOWN_LIMIT_BYTES,
   type AttachmentPreviewKind,
@@ -119,6 +122,9 @@ function App() {
   const [sendFx, setSendFx] = useState<SendFx | null>(null);
   const [charging, setCharging] = useState(false);
   const [arrivals, setArrivals] = useState<Record<string, ArrivalOrigin>>({});
+  // Presentation-only signal for the PAIRING auto-trigger (§3.3): bumped whenever
+  // an arrival from another device is detected. Does not change any queue data.
+  const [remoteArrivalSignal, setRemoteArrivalSignal] = useState(0);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const sendFxIdRef = useRef(0);
   const seenIdsRef = useRef<Set<string>>(new Set());
@@ -194,6 +200,12 @@ function App() {
                       }
                       return next;
                     });
+
+                    // A genuine handshake: another device is live in the room.
+                    // Feeds the PairingCard's auto "Linked" celebration (§3.3).
+                    if (remoteIds.length > 0) {
+                      setRemoteArrivalSignal((signal) => signal + 1);
+                    }
 
                     setQueueItems(freshItems);
                     setSelectedId((current) =>
@@ -541,6 +553,7 @@ function App() {
             onClose={() => setShowPairing(false)}
             onCopyJoinLink={() => copyMarkdown(joinLink)}
             onCopyPairingCode={() => copyMarkdown(roomKey)}
+            remoteArrivalSignal={remoteArrivalSignal}
           />
         ) : null}
 
@@ -908,32 +921,85 @@ interface PairingCardProps {
   onClose: () => void;
   onCopyJoinLink: () => void;
   onCopyPairingCode: () => void;
+  /** Bumps when another device arrives (§3.3 auto-trigger). Presentation-only. */
+  remoteArrivalSignal: number;
 }
 
-function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink, onCopyPairingCode }: PairingCardProps) {
+// PAIRING — "Establish Link" (§3.3). The emotional peak: the QR module dissolves
+// into converging particles that re-form as the live sync indicator, a ring
+// expands once, and the copy shifts "Pairing QR visible" → "Linked". Triggered
+// either manually ("We're linked") or automatically when a remote arrival proves
+// a second device is live while the card is open. No pairing data logic changes.
+function PairingCard({
+  joinLink,
+  manualCode,
+  onClose,
+  onCopyJoinLink,
+  onCopyPairingCode,
+  remoteArrivalSignal,
+}: PairingCardProps) {
   const formattedManualCode = formatManualPairingCode(manualCode);
+  const [linked, setLinked] = useState(false);
+  const closeTimerRef = useRef<number | undefined>(undefined);
+  const baseSignalRef = useRef(remoteArrivalSignal);
+
+  const establishLink = useCallback(() => {
+    setLinked((already) => {
+      if (already) {
+        return already;
+      }
+      // Celebrate, then retire the card once the signature envelope (~1s) plus a
+      // short "Linked" dwell settle. Under reduced motion the envelope collapses
+      // to an instant cross-fade; the timer just gives it a brief read.
+      closeTimerRef.current = window.setTimeout(onClose, 1500);
+      return true;
+    });
+  }, [onClose]);
+
+  // Auto path: a fresh remote arrival while the card is open = a real handshake.
+  useEffect(() => {
+    if (remoteArrivalSignal > baseSignalRef.current) {
+      establishLink();
+    }
+  }, [remoteArrivalSignal, establishLink]);
+
+  useEffect(() => () => window.clearTimeout(closeTimerRef.current), []);
 
   return (
     <section className="panel pairing-card p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-semibold">Pairing QR visible</h2>
-          <p className="mt-1 text-sm text-slate-400">Scan this code or enter the 7-character pairing code.</p>
+          <h2 className="text-sm font-semibold">{linked ? 'Linked' : 'Pairing QR visible'}</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            {linked
+              ? 'This device is now live in the circle.'
+              : 'Scan this code or enter the 7-character pairing code.'}
+          </p>
         </div>
         <button aria-label="Close pairing panel" className="icon-button" onClick={onClose} type="button">
           <IconX aria-hidden size={16} />
         </button>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[112px_1fr]">
-        <div className="qr-placeholder" aria-label="Pairing QR code">
-          <QRCodeSVG
-            bgColor="transparent"
-            fgColor="#befc3c"
-            level="M"
-            marginSize={1}
-            size={96}
-            value={joinLink}
-          />
+        <div className="pairing-qr-slot" data-linked={linked ? 'true' : undefined}>
+          <div className="qr-placeholder" aria-label="Pairing QR code">
+            <QRCodeSVG
+              bgColor="transparent"
+              fgColor="#befc3c"
+              level="M"
+              marginSize={1}
+              size={96}
+              value={joinLink}
+            />
+          </div>
+          {linked ? (
+            <div className="pairing-linked">
+              <ParticleBurst count={18} direction="converge" spread={56} />
+              <span className="pairing-ring" aria-hidden="true" />
+              <span aria-hidden="true" className="sync-dot" data-status="connected" />
+              <span className="pairing-linked-label">Linked</span>
+            </div>
+          ) : null}
         </div>
         <div className="min-w-0 space-y-3">
           <div>
@@ -956,6 +1022,12 @@ function PairingCard({ joinLink, manualCode, onClose, onCopyJoinLink, onCopyPair
             iconSize={16}
             onCopy={onCopyJoinLink}
           />
+          {linked ? null : (
+            <button className="send-button fx-magnet" onClick={establishLink} type="button">
+              <IconLink aria-hidden size={16} />
+              We&rsquo;re linked
+            </button>
+          )}
           <p className="truncate font-mono text-[10px] text-slate-500">{joinLink}</p>
         </div>
       </div>
@@ -1315,6 +1387,8 @@ function QueuePanel({
   const [mobileDetailItemId, setMobileDetailItemId] = useState<string | null>(null);
   const mobileDetailItem = selectedItem?.id === mobileDetailItemId ? selectedItem : null;
   const panelRef = useRef<HTMLElement | null>(null);
+  // EXPIRY decay (§3.4): decorative ghosts for rows that just expired.
+  const { ghosts: decayGhosts, listRef } = useExpiryDecay(activeItems, now);
 
   // Cursor spotlight (§4.2): same active-panel glow as the composer.
   useEffect(() => attachSpotlight(panelRef.current), []);
@@ -1368,9 +1442,9 @@ function QueuePanel({
         <div className="queue-list-pane">
           {queueStatus === 'loading' ? <QueueSkeleton /> : null}
           {queueStatus === 'error' ? <QueueError onRefresh={onRefresh} /> : null}
-          {queueStatus === 'idle' && activeItems.length === 0 ? <EmptyQueue /> : null}
-          {queueStatus === 'idle' && activeItems.length > 0 ? (
-            <div className="queue-list-scroll fx-stagger">
+          {queueStatus === 'idle' && activeItems.length === 0 && decayGhosts.length === 0 ? <EmptyQueue /> : null}
+          {queueStatus === 'idle' && (activeItems.length > 0 || decayGhosts.length > 0) ? (
+            <div className="queue-list-scroll fx-stagger" ref={listRef}>
               {activeItems.map((item, index) => (
                 <QueueRow
                   index={index}
@@ -1382,6 +1456,9 @@ function QueuePanel({
                   origin={arrivals[item.id]}
                   selected={selectedItem?.id === item.id}
                 />
+              ))}
+              {decayGhosts.map((ghost) => (
+                <ExpiryGhost height={ghost.height} key={ghost.key} />
               ))}
             </div>
           ) : null}
@@ -1465,6 +1542,92 @@ function EmptyQueue() {
   );
 }
 
+const DECAY_GHOST_MS = 1150;
+
+interface DecayGhost {
+  key: number;
+  id: string;
+  height: number;
+}
+
+// EXPIRY decay (§3.4) — detects rows that leave the active queue because they
+// expired (not because they were deleted) and emits a short-lived decorative
+// ghost in their place. Presentation-only: it observes activeItems, never the
+// underlying queue/cleanup data. The ghost is aria-hidden and never interactive,
+// so an expired item still disappears from the accessibility tree immediately.
+function useExpiryDecay(activeItems: QueueItem[], now: Date) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const prevItemsRef = useRef<QueueItem[]>([]);
+  const heightsRef = useRef<Map<string, number>>(new Map());
+  const timersRef = useRef<Set<number>>(new Set());
+  const keyRef = useRef(0);
+  const [ghosts, setGhosts] = useState<DecayGhost[]>([]);
+
+  // Measure live row heights before paint so a ghost can take the exact place of
+  // the row about to unmount — no reflow jump (§3.4 "layout-safe").
+  useLayoutEffect(() => {
+    const container = listRef.current;
+    if (!container) {
+      return;
+    }
+    container.querySelectorAll<HTMLElement>('[data-row-id]').forEach((el) => {
+      if (el.dataset.rowId) {
+        heightsRef.current.set(el.dataset.rowId, el.offsetHeight);
+      }
+    });
+  }, [activeItems]);
+
+  useEffect(() => {
+    const currentIds = new Set(activeItems.map((item) => item.id));
+    const expired = prevItemsRef.current.filter(
+      (item) => !currentIds.has(item.id) && getItemTimeState(item.expiresAt, now).expired,
+    );
+    prevItemsRef.current = activeItems;
+
+    if (expired.length === 0) {
+      return;
+    }
+
+    const fresh = expired.map((item) => {
+      const height = heightsRef.current.get(item.id) ?? 56;
+      heightsRef.current.delete(item.id);
+      keyRef.current += 1;
+      return { key: keyRef.current, id: item.id, height };
+    });
+    setGhosts((current) => [...current, ...fresh]);
+
+    for (const ghost of fresh) {
+      const timer = window.setTimeout(() => {
+        setGhosts((current) => current.filter((candidate) => candidate.key !== ghost.key));
+        timersRef.current.delete(timer);
+      }, DECAY_GHOST_MS);
+      timersRef.current.add(timer);
+    }
+  }, [activeItems, now]);
+
+  useEffect(
+    () => () => {
+      timersRef.current.forEach((timer) => window.clearTimeout(timer));
+      timersRef.current.clear();
+    },
+    [],
+  );
+
+  return { ghosts, listRef };
+}
+
+// The decorative decay ghost itself (§3.4): a textless, aria-hidden stand-in that
+// frays into rising particles + fades (transform/opacity), then performs the one
+// layout-safe height collapse the scope sanctions. Reuses the shared ParticleBurst.
+function ExpiryGhost({ height }: { height: number }) {
+  return (
+    <div aria-hidden="true" className="queue-decay-ghost" style={{ '--ghost-h': `${height}px` } as CSSProperties}>
+      <div className="queue-decay-ghost-shape" />
+      <ParticleBurst count={20} direction="scatter" rise={16} spread={72} />
+    </div>
+  );
+}
+
 interface QueueRowProps {
   index: number;
   item: QueueItem;
@@ -1480,19 +1643,28 @@ function QueueRow({ index, item, now, onDelete, onSelect, origin, selected }: Qu
   const attachmentSummary = getAttachmentSummary(item.attachments);
   const imageCount = item.attachments.filter((attachment) => attachment.previewKind === 'image').length;
   const fileCount = item.attachments.length - imageCount;
+  // Approaching expiry (§3.4): the last ~60s gets a calm amber edge + time badge.
+  const timeState = getItemTimeState(item.expiresAt, now);
+  const approaching = !timeState.expired && timeState.remainingMs <= 60_000;
 
   return (
     <div
       className={cx('queue-row-group', origin && 'fx-condense fx-sweep', selected && 'queue-row-selected')}
+      data-approaching={approaching ? 'true' : undefined}
       data-origin={origin}
+      data-row-id={item.id}
       style={staggerStyle(index)}
     >
+      <span className="queue-edge" aria-hidden="true" />
       <button className="queue-row" onClick={() => onSelect(item.id)} title="Open queue item" type="button">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-100">{title}</p>
             <p className="mt-1 font-mono text-[11px] text-slate-500">
-              {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
+              {item.senderDeviceName} ·{' '}
+              <span className="queue-time" data-approaching={approaching ? 'true' : undefined}>
+                {formatTimeRemaining(item.expiresAt, now)}
+              </span>
               {attachmentSummary ? ` · ${attachmentSummary}` : ''}
             </p>
             {origin === 'remote' ? (

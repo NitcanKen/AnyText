@@ -21,6 +21,76 @@ export function prefersReducedMotion(): boolean {
 }
 
 /**
+ * Hard cap on particles per burst (§7). Bursts request a count, but the
+ * utility never renders more than this — the ceiling is enforced centrally so
+ * no call site can exceed the performance budget.
+ */
+export const PARTICLE_MAX = 24;
+
+// Async low-power signal: the Battery API resolves a promise, so we cache the
+// verdict in a module flag the synchronous heuristics fall back to. Until it
+// resolves, the sync checks below cover the first burst.
+let lowPowerBattery = false;
+
+function detectLowPowerBattery(): void {
+  const nav = typeof navigator !== 'undefined' ? (navigator as Navigator & {
+    getBattery?: () => Promise<{ level: number; charging: boolean }>;
+  }) : undefined;
+  nav?.getBattery?.()
+    .then((battery) => {
+      lowPowerBattery = battery.level < 0.2 && !battery.charging;
+    })
+    .catch(() => {
+      // Battery API unavailable / blocked — leave the flag false; the sync
+      // heuristics (cores / memory / Save-Data) still apply.
+    });
+}
+
+detectLowPowerBattery();
+
+/**
+ * Low-power heuristic for the particle utility (§7: "auto-disabled … on
+ * low-power heuristics"). Conservative on purpose — only genuinely constrained
+ * devices (≤2 cores, ≤2GB, Save-Data, or a low/uncharging battery) opt out, so
+ * a normal 4-core laptop keeps the effect.
+ */
+function isLowPowerDevice(): boolean {
+  if (typeof navigator === 'undefined') {
+    return false;
+  }
+  const nav = navigator as Navigator & {
+    deviceMemory?: number;
+    connection?: { saveData?: boolean };
+  };
+  if (lowPowerBattery) {
+    return true;
+  }
+  if (nav.connection?.saveData) {
+    return true;
+  }
+  if (typeof nav.deviceMemory === 'number' && nav.deviceMemory <= 2) {
+    return true;
+  }
+  if (typeof nav.hardwareConcurrency === 'number' && nav.hardwareConcurrency <= 2) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * The central gate for the reusable particle utility (§3.3 / §3.4). Returns how
+ * many particles a burst may render: `0` (→ render nothing) under reduced motion
+ * or a low-power device, otherwise the requested count clamped to `PARTICLE_MAX`.
+ * Routing through this file keeps motion policy in one place (§7/§8).
+ */
+export function particleBudget(requested = PARTICLE_MAX): number {
+  if (prefersReducedMotion() || isLowPowerDevice()) {
+    return 0;
+  }
+  return Math.max(0, Math.min(Math.floor(requested), PARTICLE_MAX));
+}
+
+/**
  * Subtle confirm haptic for the COPY `imprint` (§3.5). No-op when the device
  * lacks the Vibration API or the user prefers reduced motion.
  */
