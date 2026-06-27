@@ -792,7 +792,7 @@ function TopBar({
           </div>
           <div className="min-w-0">
             <div className="text-sm font-semibold tracking-tight">AnyText</div>
-            <div className="flex items-center gap-1.5 truncate font-mono text-[11px] text-slate-500">
+            <div className="flex items-center gap-1.5 truncate font-mono text-[11px] text-slate-400">
               <span aria-hidden className="sync-dot" data-status={syncStatus} />
               <span className="truncate">
                 room {roomId ? roomId.slice(0, 10) : 'syncing'} · {syncStatusLabel(syncStatus)}
@@ -906,7 +906,7 @@ function TopBar({
                 <IconTrash aria-hidden size={16} />
                 <span>Reset this browser</span>
               </button>
-              <p className="px-3 pb-2 font-mono text-[10px] leading-4 text-slate-500">{joinLink}</p>
+              <p className="px-3 pb-2 font-mono text-[10px] leading-4 text-slate-400">{joinLink}</p>
             </div>
           ) : null}
         </div>
@@ -1028,7 +1028,7 @@ function PairingCard({
               We&rsquo;re linked
             </button>
           )}
-          <p className="truncate font-mono text-[10px] text-slate-500">{joinLink}</p>
+          <p className="truncate font-mono text-[10px] text-slate-400">{joinLink}</p>
         </div>
       </div>
     </section>
@@ -1130,8 +1130,8 @@ function Composer({
       </div>
 
       <div className="composer-command-bar" aria-label="Composer actions">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-          <span className={cx(!markdownValidation.valid && 'text-amber-300')}>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+          <span className={cx('telemetry', !markdownValidation.valid && 'text-amber-300')}>
             {formatBytes(markdownValidation.bytes)} / {formatBytes(MARKDOWN_LIMIT_BYTES)}
           </span>
           <span>Cmd/Ctrl + Enter to send</span>
@@ -1164,7 +1164,7 @@ function Composer({
             <p className="text-sm font-medium text-slate-100">
               {dragging ? 'Drop attachments to add' : 'Attach images or files'}
             </p>
-            <p className="text-xs text-slate-500">Up to 10 files, 25MB each. Images preview; documents download.</p>
+            <p className="text-xs text-slate-400">Up to 10 files, 25MB each. Images preview; documents download.</p>
           </div>
           <button className="secondary-button fx-magnet shrink-0" onClick={() => fileInputRef.current?.click()} type="button">
             Select
@@ -1210,7 +1210,7 @@ function Composer({
             {sendButtonLabel(sendState, attachments.length)}
           </button>
           {sendDisabled && !BUSY_SEND_STATES.has(sendState) && !markdownValidation.message && attachmentErrors.length === 0 ? (
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-slate-400">
               Add Markdown or attachments to send.
             </p>
           ) : null}
@@ -1297,7 +1297,7 @@ function AttachmentList({ attachments, onRemove }: AttachmentListProps) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-slate-100">{attachment.file.name}</p>
-            <p className="font-mono text-[11px] text-slate-500">
+            <p className="telemetry font-mono text-[11px] text-slate-400">
               {formatBytes(attachment.file.size)} · {attachment.file.type || 'file'} · {attachmentStatusLabel(attachment)}
             </p>
             <AttachmentProgress attachment={attachment} />
@@ -1341,7 +1341,7 @@ function AttachmentProgress({ attachment }: { attachment: SelectedAttachment }) 
           isIndeterminate && 'progress-fill-indeterminate',
           attachment.status === 'failed' && 'progress-fill-error',
         )}
-        style={isIndeterminate ? undefined : { width: `${attachment.progress}%` }}
+        style={isIndeterminate ? undefined : { transform: `scaleX(${attachment.progress / 100})` }}
       />
     </div>
   );
@@ -1535,7 +1535,7 @@ function QueueError({ onRefresh }: { onRefresh: () => void }) {
 function EmptyQueue() {
   return (
     <div className="p-3">
-      <div className="rounded-md border border-dashed border-white/10 bg-black/10 p-5 text-sm text-slate-500">
+      <div className="rounded-md border border-dashed border-white/10 bg-black/10 p-5 text-sm text-slate-400">
         No items in the last hour.
       </div>
     </div>
@@ -1660,7 +1660,7 @@ function QueueRow({ index, item, now, onDelete, onSelect, origin, selected }: Qu
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-slate-100">{title}</p>
-            <p className="mt-1 font-mono text-[11px] text-slate-500">
+            <p className="mt-1 telemetry font-mono text-[11px] text-slate-400">
               {item.senderDeviceName} ·{' '}
               <span className="queue-time" data-approaching={approaching ? 'true' : undefined}>
                 {formatTimeRemaining(item.expiresAt, now)}
@@ -1683,7 +1683,7 @@ function QueueRow({ index, item, now, onDelete, onSelect, origin, selected }: Qu
             </div>
           ) : null}
         </div>
-        <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-500">
+        <div className="mt-3 telemetry flex items-center gap-2 text-[11px] text-slate-400">
           {imageCount > 0 ? (
             <span className="inline-flex items-center gap-1">
               <IconImageInPicture aria-hidden size={13} />
@@ -1742,7 +1742,7 @@ function MessageDetail({ expired = false, item, now, onClose, onCopyMarkdown, on
         <div>
           <p className="label">Detail</p>
           <h3 className="text-base font-semibold text-slate-100">{getQueueItemTitle(item)}</h3>
-          <p className="mt-1 font-mono text-[11px] text-slate-500">
+          <p className="mt-1 telemetry font-mono text-[11px] text-slate-400">
             {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
           </p>
         </div>
@@ -1822,7 +1822,7 @@ function AttachmentDock({ attachments, disabled, dockId, dockRef, onImagePreview
             {attachments.length === 1 ? '1 attachment' : `${attachments.length} attachments`}
           </h4>
         </div>
-        <p className="font-mono text-[11px] text-slate-500">{getAttachmentSummary(attachments)}</p>
+        <p className="telemetry font-mono text-[11px] text-slate-400">{getAttachmentSummary(attachments)}</p>
       </div>
       <div className="attachment-grid attachment-dock-grid">
         {attachments.map((attachment) =>
@@ -1871,7 +1871,7 @@ function ImageAttachment({
       </div>
       <div className="attachment-copy">
         <p className="truncate text-sm font-medium">{attachment.fileName}</p>
-        <p className="font-mono text-[11px] text-slate-500">
+        <p className="telemetry font-mono text-[11px] text-slate-400">
           {formatBytes(attachment.fileSize)} · {previewFailed ? 'preview unavailable' : 'image preview'}
         </p>
       </div>
@@ -1887,7 +1887,7 @@ function FileDownloadRow({ attachment, disabled }: { attachment: QueueAttachment
       </div>
       <div className="attachment-copy">
         <p className="truncate text-sm font-medium">{attachment.fileName}</p>
-        <p className="font-mono text-[11px] text-slate-500">
+        <p className="telemetry font-mono text-[11px] text-slate-400">
           {formatBytes(attachment.fileSize)} · {attachment.mimeType || attachment.fileType}
         </p>
       </div>
@@ -2013,7 +2013,7 @@ function DeleteConfirmDialog({
 
         <div className="confirm-summary">
           <p className="truncate text-sm font-semibold text-slate-100">{title}</p>
-          <p className="mt-1 font-mono text-[11px] text-slate-500">
+          <p className="mt-1 telemetry font-mono text-[11px] text-slate-400">
             {item.senderDeviceName} · {formatTimeRemaining(item.expiresAt, now)}
             {attachmentSummary ? ` · ${attachmentSummary}` : ''}
           </p>
@@ -2028,7 +2028,7 @@ function DeleteConfirmDialog({
           />
           <span className="min-w-0">
             <span className="block text-sm font-medium text-slate-100">Ask before deleting messages</span>
-            <span className="block text-xs text-slate-500">Turn this off when you want queue deletes to run immediately.</span>
+            <span className="block text-xs text-slate-400">Turn this off when you want queue deletes to run immediately.</span>
           </span>
         </label>
 
@@ -2056,7 +2056,7 @@ function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachmen
         <div className="mb-3 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{attachment.fileName}</p>
-            <p className="font-mono text-[11px] text-slate-500">{formatBytes(attachment.fileSize)}</p>
+            <p className="telemetry font-mono text-[11px] text-slate-400">{formatBytes(attachment.fileSize)}</p>
           </div>
           <button aria-label="Close image preview" className="icon-button" onClick={onClose} title="Close image preview" type="button">
             <IconX aria-hidden size={16} />
@@ -2071,7 +2071,7 @@ function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachmen
               src={attachment.objectUrl}
             />
           ) : (
-            <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-10 text-center text-sm text-slate-500">
+            <div className="flex min-h-48 flex-col items-center justify-center gap-3 p-10 text-center text-sm text-slate-400">
               <IconPhoto aria-hidden size={28} />
               <span>
                 {attachment.objectUrl

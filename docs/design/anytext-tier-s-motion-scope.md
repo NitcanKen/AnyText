@@ -255,10 +255,19 @@ Named primitives so every animation is composed from a known set:
 ## 6. Typography & Iconography
 
 - Keep the **mono label** signature (lime, `0.14em`, uppercase) — it's brand DNA.
-- Introduce a **tabular/mono treatment for numbers** (expiry countdown, file sizes,
-  progress %) so live data has a "telemetry" feel and never reflows.
-- Consider one distinctive display face for `h2` panel titles to create a memory
-  hook — *optional, gated on it not hurting load.*
+- **[Shipped]** A **tabular/telemetry treatment for numbers** — the `.telemetry`
+  utility (`font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1`)
+  plus an intrinsic `tabular-nums` on `.queue-time`. Applied to every live numeral:
+  the expiry countdown, the markdown byte counter, all `formatBytes` file sizes,
+  the created-at clock, and queue counts. Fixed-advance digits → live data reads as
+  an instrument readout and never reflows as values change.
+- **Display face: SKIP (decision recorded — do not adopt a web display face).**
+  Rationale: the product's brand is *fast* (§0/§7) and it ships as a static GitHub
+  Pages app — a web font is render-blocking payload + FOUT/CLS, which violates the
+  "gated on it not hurting load" constraint. The existing **mono label** (lime,
+  `0.14em`, uppercase) already supplies the distinctive memory hook, and the new
+  **tabular telemetry numerals** add a second typographic signature at *zero* font
+  payload. We stay system-native (`ui-sans-serif` + `ui-monospace`) by design.
 - Icons: keep `@tabler/icons-react`. The only custom motion icon is the
   copy→check morph (3.5).
 
@@ -340,10 +349,18 @@ A change passes only if **all** hold:
 - ~~Signature pacing: snappy vs cinematic?~~ → **Cinematic, ×1.6 (~1000ms).**
 - ~~Effect intensity?~~ → **~50% (moderate, confident, not gaudy).**
 
+### Resolved (Phase 5)
+- ~~Particles: canvas vs pure‑CSS transforms?~~ → **Pure‑CSS transform/opacity spans**
+  (`<ParticleBurst>`), capped ≤24 and budget‑gated to 0 under reduced‑motion / low‑power
+  by `particleBudget()` — no canvas, no per‑device branching needed.
+- ~~Optional display face: worth the font payload, or stay system‑native?~~ →
+  **Stay system‑native — SKIP the display face** (see §6). A web font's render‑blocking
+  payload / FOUT / CLS conflicts with the *fast* brand (§0/§7); the mono label + new
+  tabular telemetry numerals already give the typographic memory hook at zero payload.
+
 ### Still open
-- Particles: canvas vs pure‑CSS transforms — decide on the perf budget per device.
-- Optional display face: worth the font payload, or stay system‑native?
 - Aurora‑activity coupling intensity: how much is "alive" vs "distracting"?
+  (Currently ~1s lime pulse on send; tuned by feel, left open for future taste passes.)
 
 > These are intentionally left for the interactive prototype to answer by feel.
 
@@ -465,13 +482,79 @@ this list as the durable record of progress.
       reduced‑motion and a faked low‑memory hint.)
 
 ### Phase 5 — Typography & QA gate
-- [ ] Telemetry numerals (tabular) for countdown, file sizes, progress %.
-- [ ] Optional display face decision **recorded** (ship or skip + reason).
-- [ ] Every new animation has a `prefers-reduced-motion` fallback.
-- [ ] All animated properties are `transform`/`opacity` only; no layout‑prop animation.
-- [ ] `will-change` applied only while animating; particles auto‑disable under
+- [x] Telemetry numerals (tabular) for countdown, file sizes, progress %.
+      (New `.telemetry` utility — `font-variant-numeric: tabular-nums` +
+      `font-feature-settings: "tnum" 1` — plus intrinsic `tabular-nums` on
+      `.queue-time`. Applied to every live numeral: the expiry countdown
+      (`formatTimeRemaining`), the markdown byte counter, all `formatBytes` file
+      sizes (composer dock, attachment rows, detail image/file rows), the
+      created-at clock, queue counts, and the detail/confirm time lines. Progress
+      itself is a bar, not numeric %, now driven by `transform: scaleX` (below).
+      Fixed-advance digits → live data never reflows as values tick.)
+- [x] Optional display face decision **recorded** (ship or skip + reason).
+      (**SKIP** — stay system-native; see §6 + §11. A web display face is
+      render-blocking payload + FOUT/CLS, conflicting with the *fast* brand
+      (§0/§7) and the "gated on not hurting load" constraint. The mono label +
+      new tabular telemetry numerals already supply the typographic memory hook
+      at zero font payload.)
+- [x] Every new animation has a `prefers-reduced-motion` fallback.
+      (Central `@media (prefers-reduced-motion: reduce)` block neutralizes *all*
+      motion via the `*` / `*::before` / `*::after` override —
+      `animation-duration: .001ms`, `animation-iteration-count: 1`,
+      `transition-duration: .001ms` — then adds per-effect rules for THE SEND
+      (beam/shockwave/flash hidden), QUEUE ARRIVAL (opacity-only, remote cue kept),
+      COPY imprint (ripple hidden), magnet (no pull), spotlight (hidden), and
+      particles + pairing-ring (hidden → PAIRING crossfades, EXPIRY fades +
+      collapses). Audited every keyframe / transition: none escapes the override.)
+- [x] All animated properties are `transform`/`opacity` only; no layout‑prop animation.
+      (**Animated-property policy, audited across every keyframe + `transition:`** —
+      *Motion* is exclusively `transform` + `opacity` (beam = translateX/scaleX,
+      shockwave/imprint = scale, particles = translate3d/scale, sweep = translateX,
+      condense = scale/translate, etc.). The former `width`-driven `.progress-fill`
+      is converted to `transform: scaleX()` (`transform-origin: left`), so the
+      **only** layout-prop animation that remains is the §3.4-sanctioned expiry
+      `height`/`margin` collapse helper. `box-shadow` is now a purely *static*
+      depth/edge cue (§4.4/§7): the three former box-shadow *transitions* —
+      `.editor` focus ring, `.attachment-card` hover, and the
+      `.composer-panel`/`.queue-panel` edge-light — were made static (values kept,
+      transitions dropped); nothing visual was removed. `filter: blur` appears only
+      in the §3.2-mandated condense smear (GPU-composited, reflow-free,
+      RM-neutralized); the remaining `color`/`border-color`/`background-color`
+      transitions and the markdown-link `background-size` underline are paint-only,
+      reflow-free, not in §7's ban list, and RM-safe.)
+- [x] `will-change` applied only while animating; particles auto‑disable under
       reduced‑motion / low‑power.
-- [ ] AA contrast, visible focus, non‑color cue for remote arrival, decorative
+      (Audited all 7 `will-change` sites: each is on either a perpetually-animating
+      ambient layer — `.ambient-aurora`, which is `display:none` under reduced
+      motion — or a transiently-mounted signature element — send beam / core /
+      shockwave / fail-flash, `.fx-particle`, pairing — that only exists in the DOM
+      during its animation. None sits on a permanently-static element. Particles
+      are clamped by `particleBudget()` (`src/lib/motion.ts`, hard cap
+      `PARTICLE_MAX = 24`), which returns 0 — renders nothing — under reduced motion
+      or a low-power device.)
+- [x] AA contrast, visible focus, non‑color cue for remote arrival, decorative
       layers `aria-hidden`.
-- [ ] `npm run build`, `npm run lint`, `npm test` all pass; dev server has **no
+      (Secondary/functional text bumped `slate-500` → `slate-400` (#94a3b8, ≥4.5:1
+      AA on the dark surfaces; lime `--accent` and amber `--warning` already clear
+      AA as light tones). Focus stays visible — global `outline: 2px solid #befc3c`
+      on `:focus-visible`, with the editor swapping in an equivalent static
+      box-shadow ring. Remote arrival carries a non-colour cue — `.arrival-remote`
+      renders a "from another device" text badge + `aria-label`. All decorative
+      layers are `aria-hidden`: `AmbientField`, `GrainField`, `SendBeam`,
+      `.panel-spotlight`, `ParticleBurst`, `.pairing-ring`, `.queue-edge`,
+      `.queue-decay-ghost`, `.arrival-dot`, `.sync-dot`.)
+- [x] `npm run build`, `npm run lint`, `npm test` all pass; dev server has **no
       console errors**; preview screenshots captured for each signature moment.
+      (Build green — `tsc -b` typechecks the `transform: scaleX` progress binding;
+      lint clean; **34/34 tests pass**. Dev server (port 5199) verified end-to-end:
+      console had **zero errors and zero warnings** across a full send → arrival →
+      copy → pairing → expiry walkthrough. Preview screenshots captured for each of
+      the 5 signature moments: THE SEND (lime beam mid-flight across the relay
+      axis), QUEUE ARRIVAL (local lime edge; remote cyan + "from another device"
+      verified via `--sweep-color: #7dd3fc` / cyan dot), PAIRING (QR-visible →
+      "Linked" with the connected lime sync-dot), EXPIRY (amber `--warning` badge +
+      `expiry-dim-pulse` edge on the approaching row), COPY (clipboard→check icon
+      morph + lime label tint, zero layout shift). Telemetry numerals confirmed via
+      `preview_inspect`: `.telemetry` / `.queue-time` compute
+      `font-variant-numeric: tabular-nums`; functional text computes `slate-400`
+      (#94a3b8, AA-clear on the dark surfaces).)

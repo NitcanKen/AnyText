@@ -125,6 +125,14 @@ a:focus-visible {
     color: #befc3c;
   }
 
+  /* Telemetry numerals (§6): tabular figures so live data (countdown, file
+     sizes, clocks, counts) has a fixed-advance "instrument readout" feel and
+     never reflows as digits change. Apply to any element wrapping live numbers. */
+  .telemetry {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
   .input {
     width: 100%;
     border: 1px solid rgba(255, 255, 255, 0.12);
@@ -237,10 +245,14 @@ a:focus-visible {
   }
 
   .progress-fill {
+    width: 100%;
     height: 100%;
     border-radius: inherit;
     background: #befc3c;
-    transition: width 150ms ease;
+    /* width-driven progress would animate a layout prop (§7 ban); drive the fill
+       with transform: scaleX instead — compositor-only, identical visual. */
+    transform-origin: left center;
+    transition: transform 150ms ease;
   }
 
   .progress-fill-indeterminate {
@@ -1538,9 +1550,9 @@ textarea:focus-visible {
 /* ===================== Composer: editor + dropzone ===================== */
 .editor {
   caret-color: var(--accent);
-  transition:
-    border-color 160ms ease,
-    box-shadow 200ms ease;
+  /* box-shadow is the focus ring (set statically on :focus-visible below) — it
+     is never animated (§4.4/§7); only the border-color eases. */
+  transition: border-color 160ms ease;
 }
 
 .editor:focus-visible {
@@ -1766,11 +1778,12 @@ textarea:focus-visible {
 }
 
 .attachment-card {
+  /* box-shadow stays a static depth cue (§4.4/§7) — not animated; the eased
+     border-color / background-color / transform carry the hover feedback. */
   transition:
     border-color 140ms ease,
     background-color 140ms ease,
-    transform 180ms var(--ease-spring),
-    box-shadow 180ms ease;
+    transform 180ms var(--ease-spring);
 }
 
 .attachment-card:hover {
@@ -1816,15 +1829,14 @@ textarea:focus-visible {
 
 /* ---- Active panel · edge-light strengthens on hover / focus (§4.1) ----
    The "active" surface reads brighter at its top edge than a resting panel.
-   Smoothed via box-shadow only (non-signature micro-interaction; matches the
-   existing .editor / .send-button / .attachment-card box-shadow transitions). */
+   box-shadow is a static depth/edge cue, never an animated property (§4.4/§7):
+   the strengthen applies instantly on :hover / :focus-within. */
 .composer-panel,
 .queue-panel {
   /* Own stacking context so the negative-z spotlight sits above the panel fill
      yet below content — scoped to these two panels (NOT global .panel) so the
      fixed .mobile-detail-backdrop child keeps its viewport layer. */
   isolation: isolate;
-  transition: box-shadow 220ms var(--ease-out-soft);
 }
 
 .composer-panel:hover,
@@ -2157,6 +2169,13 @@ textarea:focus-visible {
   50% {
     opacity: 0.7;
   }
+}
+
+/* The countdown is the most-watched live numeral — tabular figures here are
+   intrinsic so it never reflows as the remaining minutes tick down (§6). */
+.queue-time {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
 }
 
 .queue-time[data-approaching="true"] {
