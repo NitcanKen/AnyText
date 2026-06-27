@@ -146,6 +146,62 @@ export function attachMagnet(el: HTMLElement | null, strengthPx = 3): () => void
   };
 }
 
+/**
+ * Cursor spotlight (§4.2) — the JS half of the `--spotlight` panel glow. Mirrors
+ * `attachMagnet`: on `pointermove` it writes panel-relative `--spot-x` / `--spot-y`
+ * straight to the element's inline style, rAF-throttled and never via React state
+ * (§7), so the CSS `.panel-spotlight` layer can track the pointer with a pure
+ * transform. Returns a cleanup fn; no-op under reduced motion (the CSS hides the
+ * layer there too). The glow's opacity is driven by `:hover` in CSS, so only the
+ * active (hovered) panel ever moves — at most one at a time.
+ */
+export function attachSpotlight(el: HTMLElement | null): () => void {
+  if (!el || prefersReducedMotion()) {
+    return () => {};
+  }
+
+  let raf = 0;
+  let pending: { x: number; y: number } | null = null;
+
+  const apply = () => {
+    raf = 0;
+    if (!pending) {
+      return;
+    }
+    const rect = el.getBoundingClientRect();
+    el.style.setProperty('--spot-x', `${(pending.x - rect.left).toFixed(1)}px`);
+    el.style.setProperty('--spot-y', `${(pending.y - rect.top).toFixed(1)}px`);
+  };
+
+  const onMove = (event: PointerEvent) => {
+    pending = { x: event.clientX, y: event.clientY };
+    if (!raf) {
+      raf = requestAnimationFrame(apply);
+    }
+  };
+
+  const reset = () => {
+    if (raf) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+    pending = null;
+  };
+
+  el.addEventListener('pointermove', onMove);
+  el.addEventListener('pointerleave', reset);
+  el.addEventListener('pointercancel', reset);
+
+  return () => {
+    el.removeEventListener('pointermove', onMove);
+    el.removeEventListener('pointerleave', reset);
+    el.removeEventListener('pointercancel', reset);
+    if (raf) {
+      cancelAnimationFrame(raf);
+    }
+  };
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }

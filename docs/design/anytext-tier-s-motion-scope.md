@@ -402,11 +402,34 @@ this list as the durable record of progress.
       Reduced-motion handled centrally in one block.)
 
 ### Phase 3 — Material layer
-- [ ] Edge light (`--edge-light`) on panels; stronger on raised/active.
-- [ ] Cursor spotlight (`--spotlight`), rAF‑throttled, transform/opacity only.
-- [ ] Grain layer (`--grain-opacity`) over flat fills + aurora, anti‑banding.
-- [ ] 3 enforced depth tiers (base < panel < raised).
-- [ ] Aurora brightness nudges on activity (~1s after a send).
+- [x] Edge light (`--edge-light`) on panels; stronger on raised/active.
+      (`.panel` carries `box-shadow: inset 0 1px 0 var(--edge-light)` over its soft
+      ambient shadow; `.composer-panel`/`.queue-panel` bump to `--edge-light-strong`
+      on `:hover`/`:focus-within`; raised surfaces — `.room-menu`, `.modal-panel`,
+      `.confirm-dialog`, `.mobile-detail-sheet` — also take the strong inset edge.)
+- [x] Cursor spotlight (`--spotlight`), rAF‑throttled, transform/opacity only.
+      (`attachSpotlight` in `src/lib/motion.ts` mirrors `attachMagnet`: rAF-throttled
+      `pointermove` writes panel-relative `--spot-x/--spot-y` straight to inline style,
+      **no React state**, no-op under reduced motion. `.panel-spotlight` is a decorative
+      `z-index:-1` layer per panel — the glow tracks via `transform` only and fades via
+      `opacity` only; one active panel at a time. Verified: glow pools on the panel
+      surface, behind content, never washing out text/focus.)
+- [x] Grain layer (`--grain-opacity`) over flat fills + aurora, anti‑banding.
+      (`<GrainField>` → fixed `z-index:2`, `pointer-events:none`, `aria-hidden`,
+      `opacity: var(--grain-opacity)`; a tiled inline-SVG `feTurbulence` desaturated to
+      grayscale — **no colour introduced**. Static/GPU-cheap; above panels + aurora,
+      below menus/modals. Verified the noise renders by temporarily boosting opacity.)
+- [x] 3 enforced depth tiers (base < panel < raised).
+      (`--surface-base` `#070a0c` < `--surface-panel` < `--surface-raised`; elevation is
+      carried by background + edge-light strength, not heavy drop shadow — base is bare,
+      panels get `--edge-light`, raised overlays get `--edge-light-strong`.)
+- [x] Aurora brightness nudges on activity (~1s after a send).
+      (`AmbientField` takes `energizedSignal = sendFx.id` when `phase==='fire'`; an effect
+      flips `data-energized` on `.ambient-field` for ~1s — written to the DOM, no per-frame
+      state. `.ambient-pulse` (lime, `mix-blend:screen`, **opacity-only**) rises in 160ms,
+      decays ~760ms — no conflict with the aurora keyframes. Verified end-to-end on a real
+      send: the flag held ~1s then settled. Auto-disabled under reduced motion since the
+      whole field is `display:none`.)
 
 ### Phase 4 — Emotional peaks
 - [ ] 3.3 PAIRING: QR dissolves into particles → re‑forms as live sync dot.

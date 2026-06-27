@@ -89,10 +89,15 @@ a:focus-visible {
   }
 
   .panel {
+    position: relative;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    background: rgba(16, 21, 24, 0.96);
-    box-shadow: 0 18px 70px rgba(0, 0, 0, 0.28);
+    background: var(--surface-panel);
+    /* Depth tier "panel": a 1px lit top edge (glass, not flat card) over a soft
+       ambient shadow — shadow is ambience, edge-light does the elevation (§4.1/§4.4). */
+    box-shadow:
+      inset 0 1px 0 var(--edge-light),
+      0 18px 70px rgba(0, 0, 0, 0.28);
   }
 
   .panel-header {
@@ -464,8 +469,11 @@ a:focus-visible {
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
-    background: #11171a;
-    box-shadow: 0 24px 90px rgba(0, 0, 0, 0.45);
+    background: var(--surface-raised);
+    /* Raised tier: stronger lit edge than panels (§4.1/§4.4). */
+    box-shadow:
+      inset 0 1px 0 var(--edge-light-strong),
+      0 24px 90px rgba(0, 0, 0, 0.45);
     animation: menu-in 140ms ease both;
   }
 
@@ -684,7 +692,11 @@ a:focus-visible {
     width: min(920px, 100%);
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 8px;
-    background: #101518;
+    background: var(--surface-raised);
+    /* Raised tier: lit top edge + deep ambient shadow so it floats above the panel. */
+    box-shadow:
+      inset 0 1px 0 var(--edge-light-strong),
+      0 28px 96px rgba(0, 0, 0, 0.5);
     padding: 1rem;
   }
 
@@ -709,9 +721,10 @@ a:focus-visible {
       linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 128px),
       #11171a;
     padding: 1rem;
+    /* Raised tier: stronger lit edge than panels (§4.1/§4.4). */
     box-shadow:
       0 28px 96px rgba(0, 0, 0, 0.52),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      inset 0 1px 0 var(--edge-light-strong);
     animation: confirm-dialog-in 170ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
@@ -804,8 +817,11 @@ a:focus-visible {
     overflow: hidden;
     border: 1px solid rgba(255, 255, 255, 0.12);
     border-radius: 0;
-    background: #101518;
-    box-shadow: 0 -24px 90px rgba(0, 0, 0, 0.48);
+    background: var(--surface-raised);
+    /* Raised tier: lit top edge over the lifting shadow (§4.1/§4.4). */
+    box-shadow:
+      inset 0 1px 0 var(--edge-light-strong),
+      0 -24px 90px rgba(0, 0, 0, 0.48);
     animation: sheet-in 180ms ease both;
   }
 
@@ -1200,6 +1216,18 @@ a:focus-visible {
      `#eaffb9a` is invalid CSS (7 hex digits) — corrected to a valid hot lime. */
   --beam-core: #eaffb9; /* hot center of the send beam */
   --beam-edge: rgba(190, 252, 60, 0); /* transparent lime tail */
+
+  /* Material & light system (Tier-S §4 / Phase 3) — all subtle by design. */
+  --edge-light: rgba(255, 255, 255, 0.1); /* glass top-edge highlight on panels */
+  --edge-light-strong: rgba(255, 255, 255, 0.16); /* raised / active surfaces */
+  --grain-opacity: 0.025; /* 2.5% noise over flat fills + aurora, anti-banding */
+  --spotlight: rgba(190, 252, 60, 0.06); /* cursor-follow panel glow — lime, NOT a new accent */
+
+  /* Three enforced depth tiers (§4.4): base < panel < raised. Expressed via
+     background + edge-light, never heavy drop shadow. */
+  --surface-base: #070a0c; /* app background — lowest tier */
+  --surface-panel: rgba(16, 21, 24, 0.96); /* composer / queue panels — mid tier */
+  --surface-raised: #11171a; /* menus / modals / dialogs / sheets — top tier */
 }
 
 /* --- Global texture: selection + buttery custom scrollbars --- */
@@ -1704,6 +1732,106 @@ textarea:focus-visible {
 }
 
 /* ============================================================= */
+/* MATERIAL & LIGHT SYSTEM — depth, spotlight, grain (Tier-S §4) */
+/* All subtle by design: lit glass over flat cards, a cursor      */
+/* spotlight that's imperceptible alone but "alive" in aggregate, */
+/* and a grain layer that kills banding. GPU-cheap; the only       */
+/* moving prop is the spotlight's transform + the pulse's opacity. */
+/* ============================================================= */
+
+/* ---- Active panel · edge-light strengthens on hover / focus (§4.1) ----
+   The "active" surface reads brighter at its top edge than a resting panel.
+   Smoothed via box-shadow only (non-signature micro-interaction; matches the
+   existing .editor / .send-button / .attachment-card box-shadow transitions). */
+.composer-panel,
+.queue-panel {
+  /* Own stacking context so the negative-z spotlight sits above the panel fill
+     yet below content — scoped to these two panels (NOT global .panel) so the
+     fixed .mobile-detail-backdrop child keeps its viewport layer. */
+  isolation: isolate;
+  transition: box-shadow 220ms var(--ease-out-soft);
+}
+
+.composer-panel:hover,
+.composer-panel:focus-within,
+.queue-panel:hover,
+.queue-panel:focus-within {
+  box-shadow:
+    inset 0 1px 0 var(--edge-light-strong),
+    0 18px 70px rgba(0, 0, 0, 0.28);
+}
+
+/* ---- Cursor spotlight (§4.2) ----
+   A faint lime pool that follows the pointer on the active panel. The helper
+   `attachSpotlight` writes panel-relative --spot-x/--spot-y (rAF-throttled, no
+   React state); the glow tracks via transform only and fades via opacity only.
+   z-index:-1 + the panel's own overflow:hidden keep it above the fill, below all
+   content, and clipped to the rounded rect. */
+.panel-spotlight {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.panel-spotlight::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--spotlight), transparent 66%);
+  opacity: 0;
+  transform: translate3d(calc(var(--spot-x, 50%) - 240px), calc(var(--spot-y, 50%) - 240px), 0);
+  transition: opacity 280ms var(--ease-out-soft);
+  will-change: transform, opacity;
+}
+
+.composer-panel:hover .panel-spotlight::before,
+.queue-panel:hover .panel-spotlight::before {
+  opacity: 1;
+}
+
+/* ---- Grain (§4.3) ----
+   A single static, tiled feTurbulence noise (desaturated → grayscale, no colour
+   introduced) over flat fills + aurora to kill banding on large screens. Fixed,
+   pointer-events:none, above panels (z-index:1 ctx) + aurora (z:0) but below
+   menus/modals (z:30–50). Static texture — kept under reduced motion. */
+.grain-field {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  opacity: var(--grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+/* ---- Aurora activity coupling (§4.5) ----
+   A send nudges the ambient field's luminance for ~1s so it feels responsive to
+   use, not a screensaver. Opacity-only (no conflict with the aurora keyframes);
+   quick rise (160ms) then a slow ~0.8s decay. Lime — not a new accent. Disabled
+   for free because .ambient-field is display:none under reduced motion. */
+.ambient-pulse {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 46% 40%, rgba(190, 252, 60, 0.12), transparent 58%);
+  opacity: 0;
+  mix-blend-mode: screen;
+  transition: opacity 760ms var(--ease-out-soft);
+  will-change: opacity;
+}
+
+.ambient-field[data-energized="true"] .ambient-pulse {
+  opacity: 1;
+  transition-duration: 160ms;
+}
+
+/* ============================================================= */
 /* SIGNATURE MOMENTS — Relay Axis (Tier-S §3.1 / §3.2)           */
 /* THE SEND: charge → fire (L→R beam) → condense.                */
 /* GPU-only: transform / opacity primary; brief filter only on   */
@@ -2193,5 +2321,13 @@ textarea:focus-visible {
   /* magnet = no positional pull; the border/background hover still confirms. */
   .fx-magnet:hover:not(:active) {
     transform: none !important;
+  }
+
+  /* MATERIAL · cursor spotlight follows the pointer, so it has no meaningful
+     reduced-motion form — hide it (the JS helper already no-ops). The static
+     grain + edge-light are texture, not motion, so they remain. The aurora
+     activity pulse rides inside .ambient-field, already display:none above. */
+  .panel-spotlight {
+    display: none !important;
   }
 }

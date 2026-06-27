@@ -50,7 +50,7 @@ import {
 } from './lib/anytext';
 import { copyText } from './lib/clipboard';
 import { cx } from './lib/cx';
-import { attachMagnet, prefersReducedMotion, staggerStyle } from './lib/motion';
+import { attachMagnet, attachSpotlight, prefersReducedMotion, staggerStyle } from './lib/motion';
 import {
   buildJoinLink,
   clearRoomKey,
@@ -483,7 +483,8 @@ function App() {
 
   return (
     <div className="app-shell bg-[#070a0c] text-slate-100">
-      <AmbientField />
+      <AmbientField energizedSignal={sendFx?.phase === 'fire' ? sendFx.id : undefined} />
+      <GrainField />
       <SendBeam fx={sendFx} />
       <TopBar
         deleteConfirmationEnabled={deleteConfirmationEnabled}
@@ -615,6 +616,7 @@ function FirstRunScreen({ onCreate, onJoin }: FirstRunScreenProps) {
   return (
     <main className="flex min-h-[100dvh] items-center justify-center bg-[#070a0c] p-4 text-slate-100">
       <AmbientField />
+      <GrainField />
       <section className="first-run-card w-full max-w-xl rounded-lg border border-white/10 bg-[#101518] p-5 shadow-2xl shadow-black/30">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
@@ -998,10 +1000,15 @@ function Composer({
 }: ComposerProps) {
   const [dragging, setDragging] = useState(false);
   const sendButtonRef = useRef<HTMLButtonElement | null>(null);
+  const panelRef = useRef<HTMLElement | null>(null);
 
   // `magnet` primitive (§5): the hero Send button leans toward the pointer.
   // CSS `.fx-magnet` already gives a flat 2px lift; this adds cursor-follow.
   useEffect(() => attachMagnet(sendButtonRef.current), []);
+
+  // Cursor spotlight (§4.2): the active panel carries a faint lime pool that
+  // follows the pointer (rAF-throttled, transform/opacity only, no React state).
+  useEffect(() => attachSpotlight(panelRef.current), []);
 
   function handleDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
@@ -1010,7 +1017,8 @@ function Composer({
   }
 
   return (
-    <section className="panel workspace-panel composer-panel">
+    <section className="panel workspace-panel composer-panel" ref={panelRef}>
+      <span className="panel-spotlight" aria-hidden="true" />
       <div className="panel-header">
         <div>
           <p className="label">Compose</p>
@@ -1306,6 +1314,10 @@ function QueuePanel({
 }: QueuePanelProps) {
   const [mobileDetailItemId, setMobileDetailItemId] = useState<string | null>(null);
   const mobileDetailItem = selectedItem?.id === mobileDetailItemId ? selectedItem : null;
+  const panelRef = useRef<HTMLElement | null>(null);
+
+  // Cursor spotlight (§4.2): same active-panel glow as the composer.
+  useEffect(() => attachSpotlight(panelRef.current), []);
 
   function selectItem(id: string) {
     onSelect(id);
@@ -1323,7 +1335,8 @@ function QueuePanel({
   }
 
   return (
-    <section className="panel workspace-panel queue-panel">
+    <section className="panel workspace-panel queue-panel" ref={panelRef}>
+      <span className="panel-spotlight" aria-hidden="true" />
       <div className="panel-header">
         <div>
           <p className="label">Queue</p>
@@ -1907,15 +1920,43 @@ function ImagePreviewModal({ attachment, onClose }: { attachment: QueueAttachmen
   );
 }
 
-function AmbientField() {
+// Aurora activity coupling (§4.5): when `energizedSignal` changes (a send fires),
+// the ambient field brightens for ~1s then settles, so it feels responsive to use
+// rather than a screensaver. The pulse is opacity-only CSS; here we just flip a
+// data flag for ~1s — no per-frame React state.
+function AmbientField({ energizedSignal }: { energizedSignal?: number }) {
+  const fieldRef = useRef<HTMLDivElement | null>(null);
+
+  // Flip the flag straight on the DOM (an external system — the idiomatic use of
+  // an effect, and §7's "no per-frame React state"): a CSS transition handles the
+  // ~1s brighten-then-settle, so React never re-renders for the pulse.
+  useEffect(() => {
+    const el = fieldRef.current;
+    if (energizedSignal == null || !el) {
+      return;
+    }
+    el.dataset.energized = 'true';
+    const timer = window.setTimeout(() => el.removeAttribute('data-energized'), 1000);
+
+    return () => window.clearTimeout(timer);
+  }, [energizedSignal]);
+
   return (
-    <div className="ambient-field" aria-hidden="true">
+    <div className="ambient-field" aria-hidden="true" ref={fieldRef}>
       <div className="ambient-aurora ambient-aurora-a" />
       <div className="ambient-aurora ambient-aurora-b" />
       <div className="ambient-aurora ambient-aurora-c" />
       <div className="ambient-grid" />
+      <div className="ambient-pulse" />
     </div>
   );
+}
+
+// Grain (§4.3): a single static, tiled noise layer over flat fills + aurora to
+// kill colour banding on large screens. Decorative; aria-hidden, pointer-events
+// none — all styling (incl. the feTurbulence data-URI) lives in `.grain-field`.
+function GrainField() {
+  return <div className="grain-field" aria-hidden="true" />;
 }
 
 // THE SEND — the literal travelling beam that sweeps Composer (left) → Queue
