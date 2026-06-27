@@ -22,7 +22,7 @@ Node.js 24 recommended.
 
 ## Conventions
 - Put visual styling in `src/styles.css` via CSS custom properties + `@layer components`. Don't scatter Tailwind utility soup across JSX or add CSS-in-JS.
-- Animate only `transform` / `opacity`, and give every animation a fallback in the existing `prefers-reduced-motion` block.
+- DOM/CSS animations: only `transform` / `opacity`, each with a `prefers-reduced-motion` fallback. This is a **DOM-only** rule — the sanctioned WebGL canvas layer is exempt (governed by its own GPU frame budget), but must stay lazy-imported, capability-gated, and degrade to the CSS layer; never block the send/copy path.
 - Two accent colors only: `--accent` (lime = action / live / yours) and `--accent-cyan` (remote arrival). Never add a third accent.
 - Render all user Markdown through `MarkdownPreview` (react-markdown + `rehypeSanitize`). IMPORTANT: never use `dangerouslySetInnerHTML` or disable sanitization — relay content is untrusted.
 
@@ -33,4 +33,4 @@ Node.js 24 recommended.
 - Secrets live in `.env.local` (gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Never commit real values.
 
 ## Context
-- Active UI upgrade: `docs/design/anytext-tier-s-motion-scope.md` is the single source of truth. Read it before any motion/polish work; track completion against its §12 checklist.
+- Active UI ambition (GPU/WebGL): `docs/design/anytext-living-relay-webgl-scope.md` is the top-level source of truth (track its §12 checklist). `docs/design/anytext-tier-s-motion-scope.md` is now the **Tier-0 CSS fallback** spec. Read before any motion/visual work.
