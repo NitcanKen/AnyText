@@ -31,8 +31,8 @@ win is **not "many animations"** — it is **one continuous real-time scene gove
 one director, one clock, and one lighting model**, where every subsystem (loader,
 camera, pointer, objects, transitions, text) reads from the same state.
 
-A second, equally important lesson came from the procedural demo
-(`public/living-scene*.html`): a **generic particle/wireframe look is not the target**.
+A second, equally important lesson came from the early procedural demo (since
+**removed** — commit `76391d9`): a **generic particle/wireframe look is not the target**.
 The reference is **sculptural, material-driven, studio-lit, high-contrast** — which is
 why the hero core must be a **generated 3D asset**, not primitives (§7.5).
 
@@ -379,17 +379,59 @@ Each phase appends to **§10 Implementation Status** (the definition of done).
 > canonical; only regenerate when you intentionally change the model.
 
 ### Phase 0 — Foundation
-- [ ] Stack installed; `src/experience/Experience.tsx` mounts a persistent, lazy-loaded `<Canvas>`; tool unaffected.
-- [ ] `store.ts` (zustand) + `quality.ts` tiering (A/B/C/D) with manual toggle + persistence.
-- [ ] Tier-D path renders zero canvas and is fully functional.
-- [ ] Render loop pauses on `document.hidden`; adaptive DPR wired.
-- [ ] Anchor-Bridge POC: a scene marker tracks the real Send button's DOM rect.
-- [ ] Three.js code-split out of the critical chunk (verify in build output).
+> Built alongside Phase 1 in this pass: the stack was present in `node_modules` from
+> a prior spike but **undeclared in `package.json`** and **no `src/experience/*` source
+> existed**. Both were completed here as the required substrate for Phase 1.
+- [x] Stack installed; `src/experience/Experience.tsx` mounts a persistent, lazy-loaded
+      `<Canvas>`; tool unaffected. — full stack declared in `package.json`: runtime `three`
+      0.182, `@react-three/fiber` 9.6, `drei` 10.7, `@react-three/postprocessing` 3.0,
+      `postprocessing` 6.39, `zustand` 5, **`gsap` 3.15, `lenis` 1.3** (Phase 4 libs, declared
+      now, imported later → 0 bundle impact: critical chunk byte-identical); dev `@types/three`
+      0.185, **`@gltf-transform/cli` 4.4** (asset Draco pipeline). The throwaway
+      `living-scene*.html` demos were **removed from the repo** (commit `76391d9`) — never
+      deployed, and gone as a mis-reference. Canvas is a fixed `.experience-stage`
+      (z-0) behind the DOM; `App.tsx` renders it only when the tier resolves A/B/C. Existing
+      tool untouched (one added attribute + one gated root-bg class); `src/lib/*` + App.test.tsx
+      behaviour unchanged (34/34).
+- [x] `store.ts` (zustand) + `quality.ts` tiering (A/B/C/D) with manual toggle + persistence.
+      — `quality.ts` probes WebGL/reduced-motion/Save-Data/deviceMemory/cores/coarse-pointer;
+      `SceneToggle` cycles Auto→On→Off persisted to `localStorage` (`anytext.experience.pref`).
+- [x] Tier-D path renders zero canvas and is fully functional. — verified live: `Scene · Off`
+      → `canvasPresent:false`, tool fully usable, page at 60fps. Tests run in Tier-D (jsdom
+      has no WebGL) and stay green.
+- [x] Render loop pauses on `document.hidden`; adaptive DPR wired. — `frameloop` flips to
+      `never` on `visibilitychange`; `PerformanceMonitor` floats DPR within the tier cap
+      (A ≤1.75, B ≤1.5, C =1), starting conservative and climbing only with headroom.
+- [x] Anchor-Bridge POC: a scene marker tracks the real Send button's DOM rect. — `anchors.ts`
+      (registry + `[data-scene-anchor]` scan) + `useSceneAnchor`; `AnchorBridge` unprojects the
+      live Send-button rect each frame (Send button tagged `data-scene-anchor="send"`). Marker
+      shown with `?debugAnchor=1`; substrate for the Phase 2 beam.
+- [x] Three.js code-split out of the critical chunk (verify in build output). — `three`/r3f/
+      drei/postprocessing land in `Experience-*.js` (~1.09 MB, lazy `import()`); the critical
+      `index-*.js` stays ~719 KB with no `three`. Tier-D never imports the chunk or fetches the GLB/HDRI.
 
 ### Phase 1 — Stage alive
-- [ ] PointerField with inertial pointer; RelayCore breathing on sync; Bloom PostFX; CameraRig idle.
-- [ ] **RelayCore loads the generated `relay-core.glb` (asset-backed, not primitives) + PolyHaven HDRI reflections.**
-- [ ] Boot/loader sequence resolves into the deck (no spinner→swap).
+- [x] PointerField with inertial pointer; RelayCore breathing on sync; Bloom PostFX; CameraRig idle.
+      — `PointerField` (tier-scaled motes parallax + flow with inertial pointer velocity);
+      `RelayCore` lens breathes with `sync` (live Supabase realtime → 0.95); `PostFX` Bloom
+      (intensity ~0.7, **threshold 0.72** scalpel) + DOF + AGX + grain; `CameraRig` idle drift
+      + pointer parallax. 60fps on Apple M4 (Metal); no console errors.
+- [x] **RelayCore loads the generated `relay-core.glb` (asset-backed, not primitives) + PolyHaven
+      HDRI reflections.** — drei `useGLTF` loads `relay-core.glb`; named sub-parts (`vanes`,
+      `bolts`, `tube.blue.*`) animate independently; Blender PBR mats kept with tuned
+      `envMapIntensity`; `<Environment>` provides the `brown_photostudio_02_1k.hdr` reflections
+      (not background). `flat` renderer → HalfFloat HDR → AGX, matching the Blender preview.
+- [x] Boot/loader sequence resolves into the deck (no spinner→swap). — `Boot` veil over the
+      scene (under the tool, functional from frame 0) lifts — never swaps — when `ReadyGate`
+      flips `ready` (assets + first frame in); the lens powers up 0→peak and the camera pulls
+      back into the deck framing. Failure-fallback timeout lifts the veil if `ready` never fires.
+
+> **Verification (this pass):** `npm run build` / `npm run lint` / `npm test` (34) all green;
+> no console errors; preview screenshot of the central core matches the reference
+> (glowing blue lens, concentric machined discs, turbine vanes, royal-blue tube wrap, blue
+> connectors, depth-staggered glossy spheres, black + royal-blue + lime grade, scalpel bloom);
+> Tier-D (`Scene · Off`) renders zero canvas; 60fps on M4. Grade discipline holds: lime/cyan +
+> material blue only (cyan stays reserved for remote arrival, unused in the idle deck).
 
 ### Phase 2 — THE SEND
 - [ ] Charge → volumetric beam (trail + CA + camera kick) → field displacement → core ripple → condense, one ~1s shot, anchor-bridged.
@@ -425,7 +467,9 @@ Each phase appends to **§10 Implementation Status** (the definition of done).
 - **No paid services:** Hyper3D Rodin / Hunyuan3D / Sketchfab **OFF**; PolyHaven CC0 only.
   Total tooling cost **$0** (user constraint: free only).
 - **Asset, not backend:** experience layer + asset only; `src/lib/*` relay core untouched.
-- **Demos** (`public/living-scene*.html`) are throwaway proofs of the grade/approach;
-  **move them to `demo/` (not prod)** at build start. The real scene is `src/experience/*`.
+- **Demos** were throwaway proofs of the grade/approach (vanilla three.js, primitive
+  look); **removed entirely** (commit `76391d9`) so they can't be mistaken for a reference.
+  The **sole visual reference is the annotated PNG** (§1.5); the real scene is
+  `src/experience/*`; proven grade values live in §7.7 + the experience code.
 - **Provisioning verified** (this session): Blender headless build→GLB→Draco (92 KB→6.7 KB),
   MCP live `get_scene_info`, PolyHaven enabled. See [`anytext-3d-asset-pipeline.md`](./anytext-3d-asset-pipeline.md).

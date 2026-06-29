@@ -77,6 +77,9 @@ import {
   type AnyTextRpcClient,
   type RealtimeStatus,
 } from './lib/supabaseRelay';
+import { ExperienceMount } from './experience/ExperienceMount';
+import { useExperienceController } from './experience/quality';
+import { SceneToggle } from './experience/SceneToggle';
 
 type QueueLoadClient = AnyTextRpcClient & AnyTextFunctionsClient;
 interface SelectedAttachment {
@@ -99,6 +102,7 @@ type SendFx = { id: number; phase: 'fire' | 'recoil' };
 const DELETE_CONFIRMATION_STORAGE_KEY = 'anytext.confirmDeleteMessage';
 
 function App() {
+  const experience = useExperienceController();
   const [roomKey, setRoomKey] = useState(getInitialRoomKey);
   const [roomId, setRoomId] = useState('');
   const [deviceName, setDeviceName] = useState(getInitialDeviceName);
@@ -494,7 +498,16 @@ function App() {
   }
 
   return (
-    <div className="app-shell bg-[#070a0c] text-slate-100">
+    <div
+      className={cx(
+        'app-shell text-slate-100',
+        experience.active ? 'experience-active' : 'bg-[#070a0c]',
+      )}
+    >
+      {experience.active ? (
+        <ExperienceMount syncStatus={syncStatus} tier={experience.tier} />
+      ) : null}
+      <SceneToggle controller={experience} />
       <AmbientField energizedSignal={sendFx?.phase === 'fire' ? sendFx.id : undefined} />
       <GrainField />
       <SendBeam fx={sendFx} />
@@ -1195,6 +1208,7 @@ function Composer({
               !sendDisabled && sendState === 'draft_ready' && 'send-button-ready',
               sendState === 'sent' && 'send-button-sent',
             )}
+            data-scene-anchor="send"
             disabled={sendDisabled}
             onClick={onSend}
             ref={sendButtonRef}
