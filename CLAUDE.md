@@ -33,4 +33,5 @@ Node.js 24 recommended.
 - Secrets live in `.env.local` (gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Never commit real values.
 
 ## Context
-- Active UI upgrade: `docs/design/anytext-tier-s-motion-scope.md` is the single source of truth. Read it before any motion/polish work; track completion against its §12 checklist.
+- Active rebuild: `docs/design/anytext-living-scene-architecture.md` is the single source of truth (Cinematic WebGL Stage — one persistent r3f scene driven by a shared store; DOM tool surfaces float inside it). Read it before any experience/motion work; track completion against its §10 checklist.
+- `docs/design/anytext-tier-s-motion-scope.md` is now demoted to the **Tier‑D lite/fallback** mode + color‑discipline baseline (lime = action/yours, cyan = remote). Not the active target.
