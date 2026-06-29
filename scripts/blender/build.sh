@@ -5,6 +5,11 @@
 # The optimize flags disable join/flatten/palette so the named separable parts
 # (hub, lens, ring.*, vanes, bolts, tube.blue.*) survive into the web GLB.
 #
+# NOTE: geometry-deterministic but NOT byte-reproducible — a rebuild yields identical
+# structure (same parts/tri-count/size) but different bytes (Blender export + Draco are
+# not bit-exact), so it dirties git. The committed .glb is canonical; only regenerate
+# when intentionally changing the model, then commit the new artifact.
+#
 # Usage:  scripts/blender/build.sh
 set -euo pipefail
 

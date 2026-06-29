@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>AnyText — Living Scene (demo)</title>
+<style>
+  :root { --accent:#befc3c; --cyan:#7dd3fc; --ink:#05070a; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; background:var(--ink); overflow:hidden;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color:#e6edf3; }
+  #scene { position:fixed; inset:0; display:block; z-index:0; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ---- floating DOM tool surfaces (the tool lives INSIDE the scene) ---- */
+  .overlay { position:fixed; inset:0; z-index:2; pointer-events:none; }
+  .panel { position:absolute; pointer-events:auto;
+    border:1px solid rgba(255,255,255,.10); border-radius:12px;
+    background:rgba(13,18,21,.55); backdrop-filter:blur(10px) saturate(1.1);
+    -webkit-backdrop-filter:blur(10px) saturate(1.1);
+    box-shadow:0 24px 80px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06); }
+  .label { font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); }
+
+  .composer { left:max(18px,3vw); top:50%; transform:translateY(-50%); width:min(330px,40vw); padding:16px; }
+  .composer textarea { width:100%; height:120px; resize:none; margin-top:10px;
+    border:1px solid rgba(255,255,255,.10); border-radius:8px; background:rgba(0,0,0,.30);
+    color:#dfe7ee; padding:10px; line-height:1.5; font:inherit; outline:none; }
+  .composer textarea:focus { border-color:rgba(190,252,60,.5); }
+  .row { display:flex; gap:8px; margin-top:10px; }
+  .send { flex:1; border:1px solid rgba(190,252,60,.55); border-radius:8px; background:var(--accent);
+    color:#0a0d0f; font-weight:600; padding:10px; cursor:pointer; letter-spacing:.02em;
+    transition: transform .12s ease, filter .12s ease; }
+  .send:hover { filter:brightness(1.07); }
+  .send:active { transform:scale(.97); }
+  .ghost { border:1px solid rgba(125,211,252,.45); border-radius:8px; background:rgba(125,211,252,.08);
+    color:var(--cyan); padding:10px 12px; cursor:pointer; transition: transform .12s ease; }
+  .ghost:active { transform:scale(.97); }
+
+  .queue { right:max(18px,3vw); top:50%; transform:translateY(-50%); width:min(330px,40vw); padding:16px;
+    max-height:74vh; display:flex; flex-direction:column; }
+  .qlist { margin-top:12px; overflow:hidden auto; display:flex; flex-direction:column; gap:8px; padding-right:2px; }
+  .card { border:1px solid rgba(255,255,255,.10); border-radius:10px; background:rgba(255,255,255,.04);
+    padding:10px 12px; display:flex; align-items:center; gap:10px; }
+  .card .dot { width:7px; height:7px; border-radius:50%; flex:none; box-shadow:0 0 10px currentColor; }
+  .card .body { min-width:0; }
+  .card .t { font-size:13px; color:#e7eef5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .card .m { font-size:10px; letter-spacing:.12em; color:#7d8a97; }
+  .card.in { animation: condense .6s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes condense { from { opacity:0; filter:blur(10px); transform:translateX(14px) scale(.94);} to { opacity:1; filter:blur(0); transform:none; } }
+
+  .topbar { left:50%; top:18px; transform:translateX(-50%); padding:9px 16px; display:flex; gap:12px; align-items:center; }
+  .topbar b { font-weight:600; font-size:13px; letter-spacing:.01em; }
+  .hint { left:50%; bottom:18px; transform:translateX(-50%); padding:8px 14px; font-size:12px; color:#9fb0bd; }
+  .hint .mono { color:var(--accent); }
+
+  #boot { position:fixed; inset:0; z-index:5; display:grid; place-items:center; background:var(--ink);
+    transition: opacity .8s ease; }
+  #boot .ring { width:46px; height:46px; border-radius:50%; border:2px solid rgba(190,252,60,.25);
+    border-top-color:var(--accent); animation: spin 1s linear infinite; }
+  #boot .txt { position:absolute; bottom:38%; font-size:11px; letter-spacing:.18em; color:#6f7c89; text-transform:uppercase; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  @media (max-width:760px){ .composer,.queue{ width:min(86vw,330px);} .composer{ top:auto; bottom:96px; transform:none;} .queue{ top:78px; transform:none; max-height:36vh;} }
+  @media (prefers-reduced-motion: reduce){ #boot .ring{ animation:none;} }
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="boot"><div class="ring"></div><div class="txt">powering up the relay</div></div>
+
+  <div class="overlay">
+    <div class="panel topbar"><b>AnyText</b><span class="label">living scene · demo</span></div>
+
+    <div class="panel composer">
+      <div class="label">Send markdown</div>
+      <textarea id="msg" spellcheck="false">## ship it
+The fire is a real beam now — mass, trail, impact, condense.</textarea>
+      <div class="row">
+        <button class="send" id="sendBtn">Send →</button>
+        <button class="ghost" id="remoteBtn" title="Simulate an item arriving from another device">⟂ remote</button>
+      </div>
+    </div>
+
+    <div class="panel queue">
+      <div class="label">Relay queue</div>
+      <div class="qlist" id="qlist"></div>
+    </div>
+
+    <div class="panel hint">move the mouse — the field has inertia · press <span class="mono">Send</span> to relay</div>
+  </div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const LIME = new THREE.Color('#befc3c');
+const CYAN = new THREE.Color('#7dd3fc');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- renderer / scene / camera (the persistent stage) ----------
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x05070a, 0.055);
+
+const camera = new THREE.PerspectiveCamera(52, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 0, 7);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), reduce?0.55:1.15, 0.7, 0.2);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+scene.add(new THREE.AmbientLight(0x223044, 0.6));
+const coreLight = new THREE.PointLight(0xbefc3c, 30, 30, 2.0);
+scene.add(coreLight);
+
+// ---------- RelayCore: the luminous node = your room/connection ----------
+const coreUniforms = {
+  uTime:{value:0}, uIntensity:{value:1}, uColor:{value:LIME.clone()}, uImpact:{value:0}
+};
+const core = new THREE.Mesh(
+  new THREE.IcosahedronGeometry(1.05, 6),
+  new THREE.ShaderMaterial({
+    uniforms: coreUniforms,
+    vertexShader:`
+      uniform float uTime; uniform float uImpact;
+      varying vec3 vN; varying vec3 vP;
+      void main(){
+        vec3 p = position;
+        float w = sin(p.x*3.2+uTime)*sin(p.y*3.0+uTime*1.2)*sin(p.z*3.4+uTime*0.8);
+        p += normal * (w*0.05 + uImpact*0.22);
+        vN = normalize(normalMatrix*normal);
+        vec4 mv = modelViewMatrix*vec4(p,1.0);
+        vP = mv.xyz;
+        gl_Position = projectionMatrix*mv;
+      }`,
+    fragmentShader:`
+      uniform vec3 uColor; uniform float uIntensity;
+      varying vec3 vN; varying vec3 vP;
+      void main(){
+        vec3 v = normalize(-vP);
+        float fres = pow(1.0 - max(dot(v, vN), 0.0), 2.4);
+        vec3 col = uColor * (0.18 + fres*2.2) * uIntensity;
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  })
+);
+scene.add(core);
+const coreInner = new THREE.Mesh(
+  new THREE.SphereGeometry(0.5, 32, 32),
+  new THREE.MeshBasicMaterial({ color:0xeaffba })
+);
+scene.add(coreInner);
+
+// ---------- PointerField: particles that drift + react with inertia ----------
+const N = (innerWidth < 760) ? 2600 : 5200;
+const fpos = new Float32Array(N*3), fbase = new Float32Array(N*3), fcol = new Float32Array(N*3);
+for (let i=0;i<N;i++){
+  const r = 3.2 + Math.random()*6.0, t = Math.random()*Math.PI*2, ph = Math.acos(2*Math.random()-1);
+  const x = r*Math.sin(ph)*Math.cos(t), y = r*Math.sin(ph)*Math.sin(t)*0.7, z = r*Math.cos(ph);
+  fpos[i*3]=fbase[i*3]=x; fpos[i*3+1]=fbase[i*3+1]=y; fpos[i*3+2]=fbase[i*3+2]=z;
+  const c = Math.random()<0.78 ? LIME : CYAN;
+  fcol[i*3]=c.r; fcol[i*3+1]=c.g; fcol[i*3+2]=c.b;
+}
+const fgeo = new THREE.BufferGeometry();
+fgeo.setAttribute('position', new THREE.BufferAttribute(fpos,3));
+fgeo.setAttribute('color', new THREE.BufferAttribute(fcol,3));
+const field = new THREE.Points(fgeo, new THREE.PointsMaterial({
+  size:0.045, vertexColors:true, transparent:true, opacity:0.72,
+  blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true
+}));
+scene.add(field);
+
+// ---------- Send beam: head + volumetric tube trail (the redemption) ----------
+const beamHead = new THREE.Mesh(new THREE.SphereGeometry(0.16,20,20),
+  new THREE.MeshBasicMaterial({ color:0xffffff }));
+beamHead.visible = false; scene.add(beamHead);
+const trailMat = new THREE.MeshBasicMaterial({ color:LIME, transparent:true, opacity:0.9,
+  blending:THREE.AdditiveBlending, depthWrite:false });
+let trailMesh = null;
+const trail = []; const TRAIL_N = 18;
+let beamActive = false;
+
+function setTrail(points, color){
+  if (trailMesh){ scene.remove(trailMesh); trailMesh.geometry.dispose(); trailMesh=null; }
+  if (points.length < 2) return;
+  const curve = new THREE.CatmullRomCurve3(points);
+  trailMesh = new THREE.Mesh(new THREE.TubeGeometry(curve, 28, 0.075, 8, false), trailMat);
+  trailMat.color = color; scene.add(trailMesh);
+}
+
+// ---------- Anchor Bridge: DOM rect -> scene-space (beam hits the REAL button/queue) ----------
+const raycaster = new THREE.Raycaster();
+function screenToWorld(cx, cy){
+  const ndc = new THREE.Vector2((cx/innerWidth)*2-1, -(cy/innerHeight)*2+1);
+  raycaster.setFromCamera(ndc, camera);
+  const plane = new THREE.Plane(new THREE.Vector3(0,0,1), 0);
+  const out = new THREE.Vector3();
+  raycaster.ray.intersectPlane(plane, out);
+  return out || new THREE.Vector3();
+}
+function anchorOf(el){ const r = el.getBoundingClientRect(); return screenToWorld(r.left+r.width/2, r.top+r.height/2); }
+
+// ---------- pointer (smoothed, with velocity) ----------
+const ptr = { x:0,y:0, sx:0,sy:0, wake:new THREE.Vector3() };
+addEventListener('pointermove', e=>{ ptr.x=(e.clientX/innerWidth)*2-1; ptr.y=-(e.clientY/innerHeight)*2+1; });
+
+// ---------- the relay shot: charge -> fire -> travel -> impact -> condense ----------
+let camKick = 0;
+function relay(fromWorld, color, label){
+  const from = fromWorld.clone();
+  const mid  = new THREE.Vector3(0,0,0);
+  const to   = anchorOf(document.getElementById('qlist'));
+  beamHead.material.color.copy(color).lerp(new THREE.Color('#ffffff'), 0.5);
+  coreUniforms.uColor.value.copy(color);
+  coreLight.color.copy(color);
+
+  const head = beamHead; head.visible = true; head.position.copy(from); head.scale.setScalar(0.4);
+  trail.length = 0; beamActive = true;
+  const dur = reduce ? 0.45 : 0.62;
+
+  // charge
+  gsap.fromTo(head.scale, {x:0.2,y:0.2,z:0.2}, {x:1.5,y:1.5,z:1.5, duration:0.16, ease:'power2.out',
+    yoyo:true, repeat:1, onStart:()=>{ camKick = 0.6; }});
+
+  const tl = gsap.timeline();
+  // segment 1: composer -> core (fire + travel)
+  tl.to(head.position, { duration:dur, ease:'power2.inOut',
+    x:mid.x, y:mid.y, z:mid.z,
+    onUpdate(){ pushTrail(head.position, color); fieldWake(head.position); }
+  });
+  // impact at core
+  tl.add(()=>{ impact(color); camKick = 0.9; }, '>-0.02');
+  // segment 2: core -> queue (relay onward + condense)
+  tl.to(head.position, { duration:dur*0.85, ease:'power2.in',
+    x:to.x, y:to.y, z:to.z,
+    onUpdate(){ pushTrail(head.position, color); }
+  });
+  tl.add(()=>{ head.visible=false; beamActive=false; fadeTrail(); condense(color, label); });
+}
+function pushTrail(p, color){ trail.push(p.clone()); if (trail.length>TRAIL_N) trail.shift(); setTrail(trail, color); }
+function fadeTrail(){ if(!trailMesh) return; gsap.to(trailMat, { opacity:0, duration:0.4, ease:'power1.out',
+  onComplete:()=>{ if(trailMesh){ scene.remove(trailMesh); trailMesh.geometry.dispose(); trailMesh=null; } trailMat.opacity=0.9; } }); }
+function impact(color){
+  gsap.fromTo(coreUniforms.uImpact, {value:1.0}, {value:0, duration:0.7, ease:'power3.out'});
+  gsap.fromTo(coreUniforms.uIntensity, {value:3.0}, {value:1, duration:0.8, ease:'power3.out'});
+  gsap.fromTo(core.scale, {x:1.25,y:1.25,z:1.25}, {x:1,y:1,z:1, duration:0.8, ease:'elastic.out(1,0.5)'});
+}
+function condense(color, label){
+  const c = document.createElement('div'); c.className='card in';
+  const hex = '#'+color.getHexString();
+  c.innerHTML = `<span class="dot" style="background:${hex};color:${hex}"></span>
+    <div class="body"><div class="t">${label}</div><div class="m mono">${color.equals(CYAN)?'FROM ANOTHER DEVICE':'JUST NOW · YOURS'}</div></div>`;
+  const list = document.getElementById('qlist'); list.prepend(c);
+  while (list.children.length > 6) list.removeChild(list.lastChild);
+}
+
+// field wake: shove particles near the beam head outward, then they spring back
+function fieldWake(p){
+  const pa = fgeo.attributes.position; const px=p.x,py=p.y,pz=p.z;
+  for (let i=0;i<N;i++){
+    const dx=fpos[i*3]-px, dy=fpos[i*3+1]-py, dz=fpos[i*3+2]-pz;
+    const d2 = dx*dx+dy*dy+dz*dz;
+    if (d2 < 1.1){ const f = (1.1-d2)*0.5; fpos[i*3]+=dx*f; fpos[i*3+1]+=dy*f; fpos[i*3+2]+=dz*f; }
+  }
+}
+
+// ---------- master clock / render loop ----------
+const clock = new THREE.Clock();
+let running = true;
+document.addEventListener('visibilitychange', ()=>{ running = !document.hidden; if(running) clock.getDelta(); });
+
+function tick(){
+  requestAnimationFrame(tick);
+  if (!running) return;
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // pointer inertia
+  ptr.sx += (ptr.x - ptr.sx) * 0.05; ptr.sy += (ptr.y - ptr.sy) * 0.05;
+
+  // core life
+  coreUniforms.uTime.value = t;
+  const breathe = 1 + Math.sin(t*1.4)*0.04;
+  core.scale.lerp(new THREE.Vector3(breathe,breathe,breathe), 0.04);
+  coreInner.scale.setScalar(0.85 + Math.sin(t*2.0)*0.05);
+  coreLight.position.set(0,0,0);
+
+  // field: drift + spring back to base + pointer parallax
+  const pa = fgeo.attributes.position;
+  const swirl = t*0.03;
+  for (let i=0;i<N;i++){
+    fpos[i*3]   += (fbase[i*3]   - fpos[i*3])   * 0.04;
+    fpos[i*3+1] += (fbase[i*3+1] - fpos[i*3+1]) * 0.04;
+    fpos[i*3+2] += (fbase[i*3+2] - fpos[i*3+2]) * 0.04;
+  }
+  pa.needsUpdate = true;
+  field.rotation.y = swirl + ptr.sx*0.25;
+  field.rotation.x = ptr.sy*0.15;
+
+  // camera parallax + kick
+  camKick *= 0.9;
+  const tx = ptr.sx*0.9, ty = ptr.sy*0.6;
+  camera.position.x += (tx - camera.position.x)*0.05;
+  camera.position.y += (ty - camera.position.y)*0.05;
+  camera.position.z = 7 - camKick;
+  camera.lookAt(0,0,0);
+
+  composer.render();
+}
+
+// ---------- resize ----------
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight);
+});
+
+// ---------- wire the tool ----------
+function firstWords(s){ return (s.replace(/[#>*`]/g,'').trim().split('\n')[0] || 'message').slice(0,42); }
+document.getElementById('sendBtn').addEventListener('click', ()=>{
+  relay(anchorOf(document.getElementById('sendBtn')), LIME, firstWords(document.getElementById('msg').value));
+});
+document.getElementById('remoteBtn').addEventListener('click', ()=>{
+  // remote: arrives from deep -z (from afar), trailing cyan
+  relay(new THREE.Vector3(-1.5, 1.2, -9), CYAN, 'ChatGPT answer');
+});
+
+// boot resolves INTO the deck once the first frame is drawn
+tick();
+requestAnimationFrame(()=>requestAnimationFrame(()=>{
+  const boot = document.getElementById('boot');
+  boot.style.opacity = '0'; setTimeout(()=>boot.remove(), 850);
+}));
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</body>
+</html>

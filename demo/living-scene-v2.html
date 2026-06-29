@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>AnyText — Relay Space (v2)</title>
+<style>
+  :root { --lime:#befc3c; --blue:#3b82f6; --ink:#04060a; }
+  *{box-sizing:border-box;} html,body{margin:0;height:100%;background:var(--ink);overflow:hidden;
+    font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;color:#e6edf3;}
+  #scene{position:fixed;inset:0;z-index:0;display:block;}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .overlay{position:fixed;inset:0;z-index:2;pointer-events:none;}
+  .glass{position:absolute;pointer-events:auto;border:1px solid rgba(255,255,255,.08);border-radius:18px;
+    background:linear-gradient(180deg,rgba(20,26,34,.62),rgba(10,14,20,.62));
+    backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);
+    box-shadow:0 30px 90px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.07);}
+  .label{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:#8fa3b5;}
+
+  .brand{left:28px;top:22px;display:flex;align-items:center;gap:12px;font-weight:600;letter-spacing:.02em;}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 14px var(--lime);}
+  .brand small{color:#6f7d8b;font-weight:500;letter-spacing:.16em;font-size:10px;text-transform:uppercase;}
+  .settings{right:24px;top:20px;display:flex;gap:8px;align-items:center;padding:9px 14px;border-radius:14px;font-size:13px;color:#c7d2dd;}
+
+  .compose{left:34px;bottom:40px;width:min(340px,42vw);padding:16px 16px 14px;border-radius:22px;}
+  .compose .hd{display:flex;justify-content:space-between;align-items:center;}
+  .compose textarea{width:100%;height:74px;resize:none;margin-top:10px;border:none;background:transparent;
+    color:#e7eef5;line-height:1.55;font:inherit;outline:none;}
+  .chips{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap;}
+  .chip{display:flex;align-items:center;gap:6px;font-size:11px;border:1px solid rgba(255,255,255,.10);
+    border-radius:9px;padding:5px 8px;background:rgba(255,255,255,.04);color:#cdd8e2;}
+  .chip i{width:7px;height:7px;border-radius:2px;}
+  .send{margin-top:12px;width:100%;border:none;border-radius:13px;background:var(--lime);color:#0a0d0f;
+    font-weight:600;padding:11px;cursor:pointer;letter-spacing:.02em;display:flex;align-items:center;
+    justify-content:center;gap:8px;transition:transform .12s ease,filter .12s ease;
+    box-shadow:0 0 0 1px rgba(190,252,60,.4),0 10px 30px rgba(190,252,60,.18);}
+  .send:hover{filter:brightness(1.06);} .send:active{transform:scale(.98);}
+
+  .receive{right:34px;bottom:120px;width:min(280px,40vw);padding:14px 16px;border-radius:20px;opacity:.0;
+    transform:translateX(20px);transition:opacity .5s ease,transform .5s ease;}
+  .receive.show{opacity:1;transform:none;}
+  .receive .t{font-size:14px;margin-top:6px;} .receive .m{font-size:11px;color:#8aa0c8;margin-top:2px;}
+  .receive .dl{margin-top:12px;display:flex;gap:8px;}
+  .receive .dl button{flex:1;border:1px solid rgba(125,160,255,.35);background:rgba(59,130,246,.12);
+    color:#bcd3ff;border-radius:11px;padding:9px;font-size:13px;cursor:pointer;}
+
+  .orbcap{right:130px;top:96px;font-size:11px;color:#9fb4c8;letter-spacing:.12em;}
+  .hint{left:50%;bottom:20px;transform:translateX(-50%);font-size:12px;color:#7e8d9b;}
+  .hint b{color:var(--lime);font-weight:600;}
+
+  #boot{position:fixed;inset:0;z-index:5;display:grid;place-items:center;background:var(--ink);transition:opacity .9s ease;}
+  #boot .r{width:42px;height:42px;border-radius:50%;border:2px solid rgba(59,130,246,.25);border-top-color:var(--blue);animation:sp 1s linear infinite;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion:reduce){#boot .r{animation:none;}}
+</style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div id="boot"><div class="r"></div></div>
+
+  <div class="overlay">
+    <div class="glass brand">ANYTEXT <small>living relay</small><span class="dot"></span></div>
+    <div class="glass settings">⚙ Settings</div>
+
+    <div class="glass compose">
+      <div class="hd"><span class="label">Compose</span><span class="label mono">→ relay</span></div>
+      <textarea spellcheck="false" id="msg">AnyText 使用筆記 — 跨裝置即時中繼，專注傳遞。</textarea>
+      <div class="chips">
+        <span class="chip"><i style="background:#ff6b6b"></i>design-spec.pdf</span>
+        <span class="chip"><i style="background:#3b82f6"></i>mockup.png</span>
+        <span class="chip"><i style="background:#cdd8e2"></i>notes.txt</span>
+      </div>
+      <button class="send" id="sendBtn">◈ Send</button>
+    </div>
+
+    <div class="glass receive" id="receive">
+      <span class="label">Receive</span>
+      <div class="t">From MacBook-Pro</div>
+      <div class="m mono">3 items · 2.4 MB · arrived from depth</div>
+      <div class="dl"><button>⬇ Download</button><button style="flex:0 0 44px">⤺</button></div>
+    </div>
+
+    <div class="glass orbcap mono">1h relay orbit</div>
+    <div class="hint">drag to orbit · press <b>Send</b> to relay · <b>R</b> for remote arrival</div>
+  </div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const LIME = new THREE.Color('#befc3c'), BLUE = new THREE.Color('#3b82f6'), HOT = new THREE.Color('#bcd8ff');
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = document.getElementById('scene');
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04060a);
+scene.fog = new THREE.FogExp2(0x04060a, 0.085);
+
+// studio reflections — what makes black metal read as a render, not a flat shape
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
+
+const camera = new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 100);
+camera.position.set(0, 0.5, 6.4);
+
+// high-contrast lighting: white key + electric-blue rim + warm lime kiss
+const key = new THREE.DirectionalLight(0xffffff, 3.2); key.position.set(5,7,4); scene.add(key);
+const rim = new THREE.DirectionalLight(0x2f6bff, 5.0); rim.position.set(-6,-2,-5); scene.add(rim);
+const kiss = new THREE.PointLight(0xbefc3c, 7, 14, 2); kiss.position.set(-3.5,-1.6,2); scene.add(kiss);
+scene.add(new THREE.AmbientLight(0x16203a, 0.55));
+
+// ---------- materials ----------
+const matMetal = new THREE.MeshPhysicalMaterial({ color:0x0a0e15, metalness:1.0, roughness:0.3, clearcoat:1, clearcoatRoughness:0.28, envMapIntensity:1.05 });
+const matDark  = new THREE.MeshPhysicalMaterial({ color:0x0c111a, metalness:0.7, roughness:0.5, clearcoat:0.6, envMapIntensity:0.9 });
+const matBlue  = new THREE.MeshStandardMaterial({ color:0x07142b, emissive:0x2f6bff, emissiveIntensity:3.0, metalness:0.7, roughness:0.3 });
+const matLime  = new THREE.MeshStandardMaterial({ color:0x18220a, emissive:0xbefc3c, emissiveIntensity:2.6, metalness:0.5, roughness:0.4 });
+const matChrome= new THREE.MeshPhysicalMaterial({ color:0x121822, metalness:1.0, roughness:0.18, clearcoat:1, envMapIntensity:1.35 });
+const matBluePlastic = new THREE.MeshPhysicalMaterial({ color:0x1d4ed8, metalness:0.0, roughness:0.2, clearcoat:1, clearcoatRoughness:0.14, envMapIntensity:1.2 });
+
+// ---------- RelayCore: a sculptural mechanical / magnetic node ----------
+const core = new THREE.Group(); scene.add(core);
+
+const hub = new THREE.Mesh(new THREE.SphereGeometry(0.46, 64, 64), matMetal); core.add(hub);
+const coreRing = new THREE.Mesh(new THREE.TorusGeometry(0.52,0.045,16,80), matBlue); coreRing.rotation.x=Math.PI/2+0.2; core.add(coreRing);
+const hubInner = new THREE.Mesh(new THREE.SphereGeometry(0.66, 32, 32),
+  new THREE.MeshBasicMaterial({ color:0x2f6bff, transparent:true, opacity:0.26, blending:THREE.AdditiveBlending, depthWrite:false })); core.add(hubInner);
+// machined stacked discs + blue plastic tube ring + bolts (richer mechanical assembly)
+const discA = new THREE.Mesh(new THREE.CylinderGeometry(0.98,1.05,0.13,72), matMetal); discA.rotation.x=Math.PI/2+0.2; core.add(discA);
+const discB = new THREE.Mesh(new THREE.CylinderGeometry(0.74,0.80,0.20,56), matDark); discB.rotation.x=Math.PI/2+0.2; core.add(discB);
+const tubeRing = new THREE.Mesh(new THREE.TorusGeometry(0.90,0.072,20,90), matBluePlastic); tubeRing.rotation.x=Math.PI/2+0.2; core.add(tubeRing);
+for(let i=0;i<12;i++){ const a=(i/12)*Math.PI*2; const bo=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.2,10), matChrome); bo.position.set(Math.cos(a)*0.99,Math.sin(a)*0.99,0); bo.rotation.set(Math.PI/2+0.2,0,0); core.add(bo); }
+
+// concentric tilted rings
+const ringSpecs = [[1.05,0.05,matMetal,0.0],[1.45,0.035,matMetal,0.5],[1.9,0.028,matDark,1.0]];
+const rings = [];
+ringSpecs.forEach(([r,t,m,tilt],i)=>{
+  const g = new THREE.Mesh(new THREE.TorusGeometry(r, t, 24, 140), m);
+  g.rotation.x = Math.PI/2 + tilt*0.5; g.rotation.y = tilt*0.4; core.add(g); rings.push(g);
+});
+// thin blue energy ring
+const blueRing = new THREE.Mesh(new THREE.TorusGeometry(0.86, 0.014, 16, 160), matBlue);
+blueRing.rotation.x = Math.PI/2 + 0.2; core.add(blueRing);
+
+// radial turbine blades around the hub
+const blades = new THREE.Group(); core.add(blades);
+const bladeGeo = new THREE.BoxGeometry(0.5, 0.06, 0.16);
+for (let i=0;i<16;i++){
+  const b = new THREE.Mesh(bladeGeo, matMetal);
+  const a = (i/16)*Math.PI*2;
+  b.position.set(Math.cos(a)*0.86, 0, Math.sin(a)*0.86);
+  b.rotation.y = -a; b.rotation.z = 0.5;
+  blades.add(b);
+}
+// scattered blue accent nodes nested in the structure
+for (let i=0;i<5;i++){
+  const s = new THREE.Mesh(new THREE.SphereGeometry(0.045,16,16), matBlue);
+  const a = (i/5)*Math.PI*2, r=1.0+Math.random()*0.7;
+  s.position.set(Math.cos(a)*r, (Math.random()-0.5)*0.4, Math.sin(a)*r); core.add(s);
+}
+
+core.scale.setScalar(1.32);
+
+// ---------- floating glossy spheres (depth / bokeh) ----------
+const spheres = [];
+for (let i=0;i<13;i++){
+  const r = 0.14 + Math.random()*0.46;
+  const m = (i%6===0) ? matBlue.clone() : (Math.random()<0.4 ? matChrome : matMetal);
+  const s = new THREE.Mesh(new THREE.SphereGeometry(r, 32, 32), m);
+  const ang = Math.random()*Math.PI*2, rad = 3.0 + Math.random()*4.0;
+  s.position.set(Math.cos(ang)*rad, (Math.random()-0.5)*4.0, (Math.random()-0.5)*5.5 - 1.4);
+  s.userData.spin = (Math.random()-0.5)*0.3; s.userData.baseY = s.position.y; s.userData.ph = Math.random()*6.28;
+  scene.add(s); spheres.push(s);
+}
+
+// ---------- royal-blue plastic pipe/connector objects (the reference signature) ----------
+const connectors=[];
+function makeConnector(){
+  const g=new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.TorusGeometry(0.2,0.075,18,44,Math.PI*1.5), matBluePlastic));
+  const c=new THREE.Mesh(new THREE.CylinderGeometry(0.075,0.075,0.36,18), matBluePlastic);
+  c.position.set(0.2,-0.0,0); c.rotation.z=Math.PI/2; g.add(c);
+  const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.09,0.09,0.05,18), matChrome);
+  cap.position.set(0.38,0,0); cap.rotation.z=Math.PI/2; g.add(cap);
+  return g;
+}
+for(let i=0;i<7;i++){
+  const g=makeConnector(); const a=Math.random()*6.28, rad=2.5+Math.random()*3.4;
+  g.position.set(Math.cos(a)*rad,(Math.random()-0.5)*3.4,(Math.random()-0.5)*4.2-1.2);
+  g.rotation.set(Math.random()*6,Math.random()*6,Math.random()*6); g.scale.setScalar(0.7+Math.random()*0.7);
+  g.userData.s=new THREE.Vector3((Math.random()-0.5)*0.35,(Math.random()-0.5)*0.35,(Math.random()-0.5)*0.35);
+  g.userData.baseY=g.position.y; g.userData.ph=Math.random()*6.28;
+  scene.add(g); connectors.push(g);
+}
+
+// ---------- document-chip ribbon flowing through the core ----------
+function roundRect(x,X,Y,W,H,r){ x.beginPath(); x.moveTo(X+r,Y); x.arcTo(X+W,Y,X+W,Y+H,r); x.arcTo(X+W,Y+H,X,Y+H,r); x.arcTo(X,Y+H,X,Y,r); x.arcTo(X,Y,X+W,Y,r); x.closePath(); }
+function chipTexture(glyph, color, label){
+  const c=document.createElement('canvas'); c.width=256; c.height=176; const x=c.getContext('2d');
+  roundRect(x,10,10,236,156,26); x.fillStyle='rgba(8,12,18,0.92)'; x.fill();
+  x.lineWidth=4; x.strokeStyle=color; x.shadowColor=color; x.shadowBlur=18; x.stroke(); x.shadowBlur=0;
+  x.fillStyle=color; x.textAlign='center'; x.font='600 62px ui-monospace,monospace'; x.fillText(glyph,128,98);
+  x.fillStyle='rgba(210,222,234,0.85)'; x.font='600 22px ui-sans-serif,sans-serif'; x.fillText(label,128,140);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=4; return t;
+}
+const kinds=[['</>', '#d4ff5a','code'],['IMG','#7db5ff','image'],['PDF','#ff8a8a','pdf'],['TXT','#cdd8e2','text'],['{ }','#d4ff5a','md']];
+const ribbonCurve = new THREE.CatmullRomCurve3([
+  new THREE.Vector3(-3.5,-1.8,0.8), new THREE.Vector3(-1.7,-0.7,0.3),
+  new THREE.Vector3(0,0,0), new THREE.Vector3(1.7,0.8,-0.3),
+  new THREE.Vector3(3.4,1.7,-0.8)
+]);
+// faint guide ribbon
+const ribbonMesh = new THREE.Mesh(new THREE.TubeGeometry(ribbonCurve, 80, 0.02, 8, false),
+  new THREE.MeshBasicMaterial({ color:0x6f8bff, transparent:true, opacity:0.14, blending:THREE.AdditiveBlending, depthWrite:false }));
+scene.add(ribbonMesh);
+
+const chips=[]; const CHIP_N=14;
+for (let i=0;i<CHIP_N;i++){
+  const k = kinds[i%kinds.length];
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.34,0.235),
+    new THREE.MeshBasicMaterial({ map:chipTexture(k[0],k[1],k[2]), transparent:true, depthWrite:false }));
+  m.userData.off = i/CHIP_N; scene.add(m); chips.push(m);
+}
+let flow = 0, flowSpeed = 0.035;
+
+// ---------- relay orbit (queue) + device nodes ----------
+const orbit = new THREE.Group(); orbit.position.set(1.4,2.2,-1.0); orbit.rotation.set(-1.05,0.2,0.15); scene.add(orbit);
+orbit.add(new THREE.Mesh(new THREE.TorusGeometry(2.2,0.01,12,160), new THREE.MeshBasicMaterial({color:0x6f8bff,transparent:true,opacity:0.35})));
+const nodes=[];
+for (let i=0;i<4;i++){
+  const a=-0.5 - i*0.42;
+  const n=new THREE.Mesh(new THREE.SphereGeometry(0.06,20,20), i===3?matLime.clone():matBlue.clone());
+  n.position.set(Math.cos(a)*2.2, Math.sin(a)*2.2, 0); orbit.add(n); nodes.push(n);
+}
+
+// ---------- send packet ----------
+const packet = new THREE.Mesh(new THREE.SphereGeometry(0.14,24,24), new THREE.MeshBasicMaterial({color:0xeaffba}));
+packet.visible=false; scene.add(packet);
+
+// ---------- post: DOF bokeh + selective bloom ----------
+const ec = new EffectComposer(renderer);
+ec.addPass(new RenderPass(scene, camera));
+const bokeh = new BokehPass(scene, camera, { focus: 6.6, aperture: 0.0001, maxblur: 0.007 });
+ec.addPass(bokeh);
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), reduce?0.3:0.55, 0.55, 0.72);
+ec.addPass(bloom);
+ec.addPass(new OutputPass());
+
+// ---------- interaction: drag to orbit camera, pointer parallax ----------
+const ptr={x:0,y:0,sx:0,sy:0}, drag={on:false,px:0,py:0,rx:0.0,ry:0.0,trx:0,try:0};
+addEventListener('pointermove',e=>{ ptr.x=(e.clientX/innerWidth)*2-1; ptr.y=-(e.clientY/innerHeight)*2+1;
+  if(drag.on){ drag.try += (e.clientX-drag.px)*0.004; drag.trx += (e.clientY-drag.py)*0.003; drag.px=e.clientX; drag.py=e.clientY; }});
+canvas.addEventListener('pointerdown',e=>{drag.on=true;drag.px=e.clientX;drag.py=e.clientY;});
+addEventListener('pointerup',()=>drag.on=false);
+
+// ---------- the relay shot ----------
+let busy=false, camKick=0;
+function relay(color, remote){
+  if(busy) return; busy=true;
+  packet.material.color.copy(color===LIME?new THREE.Color(0xeaffba):HOT);
+  matBlue.emissiveIntensity = 3.2;
+  const path = remote
+    ? new THREE.CatmullRomCurve3([new THREE.Vector3(2.6,1.4,-7), new THREE.Vector3(1.2,0.6,-2.5), new THREE.Vector3(0,0,0), new THREE.Vector3(1.4,2.0,-1.0)])
+    : ribbonCurve;
+  packet.visible=true; packet.scale.setScalar(0.2);
+  const o={t:0};
+  gsap.timeline({ onComplete:()=>{ packet.visible=false; busy=false; nodes[3].material.emissiveIntensity=4; gsap.to(nodes[3].material,{emissiveIntensity:2.6,duration:0.8}); if(remote){ const r=document.getElementById('receive'); r.classList.add('show'); } } })
+    .to(packet.scale,{x:1.6,y:1.6,z:1.6,duration:0.16,yoyo:true,repeat:1,ease:'power2.out',onStart:()=>{camKick=0.5;}})
+    .to(o,{t:1,duration:reduce?0.6:1.0,ease:'power2.inOut',onUpdate:()=>{ packet.position.copy(path.getPoint(o.t)); flowSpeed=0.035+o.t*0.25;
+       if(o.t>0.45 && o.t<0.55){ gsap.to(core.scale,{x:1.12,y:1.12,z:1.12,duration:0.2,yoyo:true,repeat:1,ease:'power2.out'}); blueRing.material.emissiveIntensity=6; gsap.to(blueRing.material,{emissiveIntensity:3.2,duration:0.6}); camKick=0.7; } }}, '<0.1')
+    .to({},{duration:0.4,onComplete:()=>{flowSpeed=0.035;}});
+}
+addEventListener('keydown',e=>{ if(e.key==='r'||e.key==='R') relay(BLUE,true); });
+document.getElementById('sendBtn').addEventListener('click',()=>relay(LIME,false));
+
+// ---------- loop ----------
+const clock=new THREE.Clock(); let running=true;
+document.addEventListener('visibilitychange',()=>{running=!document.hidden; if(running)clock.getDelta();});
+function tick(){
+  requestAnimationFrame(tick); if(!running) return;
+  const dt=Math.min(clock.getDelta(),0.05), t=clock.elapsedTime;
+
+  core.rotation.y += dt*0.18; blades.rotation.y -= dt*0.35;
+  rings[0].rotation.z += dt*0.25; rings[1].rotation.z -= dt*0.18; rings[2].rotation.z += dt*0.12;
+  hubInner.scale.setScalar(1+Math.sin(t*1.6)*0.05);
+  matBlue.emissiveIntensity += (3.2-matBlue.emissiveIntensity)*0.05;
+
+  flow=(flow+dt*flowSpeed)%1;
+  chips.forEach(c=>{ const tt=(c.userData.off+flow)%1; const p=ribbonCurve.getPoint(tt); c.position.copy(p);
+    c.quaternion.copy(camera.quaternion); const fade=Math.min(tt,1-tt)*5; c.material.opacity=Math.max(0,Math.min(1,fade)); });
+
+  spheres.forEach(s=>{ s.rotation.y+=dt*s.userData.spin; s.position.y=s.userData.baseY+Math.sin(t*0.5+s.userData.ph)*0.12; });
+  connectors.forEach(c=>{ c.rotation.x+=dt*c.userData.s.x; c.rotation.y+=dt*c.userData.s.y; c.rotation.z+=dt*c.userData.s.z; c.position.y=c.userData.baseY+Math.sin(t*0.45+c.userData.ph)*0.14; });
+  orbit.rotation.z += dt*0.04;
+
+  ptr.sx+=(ptr.x-ptr.sx)*0.05; ptr.sy+=(ptr.y-ptr.sy)*0.05;
+  drag.ry+=(drag.try-drag.ry)*0.08; drag.rx+=(drag.trx-drag.rx)*0.08;
+  camKick*=0.9;
+  const rdist=6.4-camKick;
+  camera.position.x=Math.sin(drag.ry)*rdist + ptr.sx*0.3;
+  camera.position.z=Math.cos(drag.ry)*rdist;
+  camera.position.y=0.6 + drag.rx*2.2 + ptr.sy*0.25;
+  camera.lookAt(0,0,0);
+
+  ec.render();
+}
+addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); ec.setSize(innerWidth,innerHeight); });
+
+tick();
+requestAnimationFrame(()=>requestAnimationFrame(()=>{ const b=document.getElementById('boot'); b.style.opacity='0'; setTimeout(()=>b.remove(),900); }));
+</script>
+</body>
+</html>

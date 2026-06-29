@@ -373,6 +373,10 @@ Each phase appends to **§10 Implementation Status** (the definition of done).
 
 > Reproduce: `scripts/blender/build.sh` (Blender headless `build_core.py` → gltf-transform
 > Draco). The `.glb` are build artifacts — never hand-edit; regenerate from `build_core.py`.
+> Note: the build is **geometry-deterministic but not byte-reproducible** — re-running
+> yields identical structure (same parts/tri-count/size) but different bytes (Blender
+> export + Draco are not bit-exact), so a rebuild dirties git. The committed `.glb` is
+> canonical; only regenerate when you intentionally change the model.
 
 ### Phase 0 — Foundation
 - [ ] Stack installed; `src/experience/Experience.tsx` mounts a persistent, lazy-loaded `<Canvas>`; tool unaffected.
