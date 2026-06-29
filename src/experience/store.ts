@@ -66,6 +66,84 @@ export function integratePointer(dt: number): void {
 }
 
 // --------------------------------------------------------------------------------------
+// THE SEND — the send shot's event bus + per-frame signal bus (SoT §5)
+// --------------------------------------------------------------------------------------
+//
+// Two pieces, mirroring the pointer split above:
+//  - A discrete *event* (`emitSend`) the App fires once per commit, which the
+//    SendBeam system turns into one ~1s GSAP shot. Routed through a plain listener
+//    set (not zustand) so it stays a fire-once event, not reactive state, and so the
+//    light App critical chunk can fire it without importing `three`.
+//  - A high-frequency *signal* singleton (`sendPulse`) the SendBeam writes each frame
+//    and every other subsystem polls in `useFrame` — the same mutable-singleton
+//    pattern as `pointer`. This is how one shot simultaneously pushes the field,
+//    ripples the core, kicks the camera, and spikes chromatic aberration: they all
+//    read the same numbers each tick (the "one director" mechanism, SoT §3).
+
+export type SendStatus = 'fire' | 'recoil';
+export interface SendEvent {
+  id: number;
+  status: SendStatus;
+}
+
+type SendListener = (event: SendEvent) => void;
+const sendListeners = new Set<SendListener>();
+let sendSeq = 0;
+
+/** Fire a send event (App → scene). Returns the event id. No-op visually if the
+ * experience layer isn't mounted (Tier-D), since nothing is subscribed. */
+export function emitSend(status: SendStatus): number {
+  sendSeq += 1;
+  const event: SendEvent = { id: sendSeq, status };
+  for (const listener of sendListeners) listener(event);
+  return sendSeq;
+}
+
+/** Subscribe to send events (the SendBeam system). Returns an unsubscribe fn. */
+export function subscribeSend(listener: SendListener): () => void {
+  sendListeners.add(listener);
+  return () => {
+    sendListeners.delete(listener);
+  };
+}
+
+/**
+ * Per-frame signals the SendBeam writes and other systems read. Plain numbers only
+ * (NO `three` — this module is light enough for the critical chunk). World-space
+ * vectors are passed as separate scalar fields rather than a Vector3.
+ */
+export interface SendPulse {
+  /** A beam is in flight (charge → impact window) — gates field displacement. */
+  active: boolean;
+  /** Beam tip in world space (the projectile's current position). */
+  tipX: number;
+  tipY: number;
+  tipZ: number;
+  /** 0..1 progress of the fire→impact leg (push strength grows as it travels). */
+  travel: number;
+  /** 0..1 impulse the core ripples on (spikes at impact, then decays). */
+  impact: number;
+  /** 0..1 camera-kick impulse (spikes at launch, then decays). */
+  kick: number;
+  /** 0..1 chromatic-aberration spike (launch + impact). */
+  ca: number;
+  /** 0..1 fail-recoil danger flash (drives the core's red pulse). */
+  danger: number;
+}
+
+export const sendPulse: SendPulse = {
+  active: false,
+  tipX: 0,
+  tipY: 0,
+  tipZ: 0,
+  travel: 0,
+  impact: 0,
+  kick: 0,
+  ca: 0,
+  danger: 0,
+};
+
+// --------------------------------------------------------------------------------------
 // Discrete director state (zustand)
 // --------------------------------------------------------------------------------------
 

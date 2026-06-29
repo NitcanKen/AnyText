@@ -18,11 +18,13 @@ import { useGLTF } from '@react-three/drei';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { ASSET } from '../assets';
-import { useExperienceStore } from '../store';
+import { sendPulse, useExperienceStore } from '../store';
 
 // Peak emissive intensity of the lens once powered up. Kept modest on purpose:
 // the bloom threshold (0.72) should catch it as a sharp glow, never a wash (§7.7).
 const LENS_PEAK = 3.1;
+const CORE_SCALE = 1.55;
+const DANGER = new THREE.Color('#f87171'); // fail-recoil flash only
 
 export function RelayCore() {
   const { scene } = useGLTF(ASSET.core);
@@ -30,6 +32,7 @@ export function RelayCore() {
   const tiltRef = useRef<THREE.Group>(null);
   const spinRef = useRef<THREE.Group>(null);
   const lensMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
+  const lensBaseEmissive = useRef<THREE.Color>(new THREE.Color('#3aa0ff'));
   const subRefs = useRef<Record<string, THREE.Object3D | null>>({});
 
   // One-time material grade + part collection. In a layout effect (not render) so
@@ -53,6 +56,7 @@ export function RelayCore() {
           std.envMapIntensity = 0.4;
           std.toneMapped = true;
           lensMatRef.current = std;
+          lensBaseEmissive.current.copy(std.emissive); // for the danger-flash lerp
         } else if (name.includes('blue')) {
           // Royal-blue plastic — glossy, picks up sharp blue speculars.
           std.envMapIntensity = 1.15;
@@ -82,26 +86,38 @@ export function RelayCore() {
     const t = performance.now() / 1000;
     const motion = reducedMotion ? 0.15 : 1;
 
+    // THE SEND impact (SoT §5.4): the projectile strikes the core; it ripples
+    // outward and the sub-rings react — vanes spin up, the whole assembly pops.
+    const impact = sendPulse.impact;
+
     // Slow mechanical rotation of the whole assembly about its own axis.
     if (spinRef.current) spinRef.current.rotation.y += dt * 0.16 * motion;
 
     // Independent sub-rings — a turbine reads alive when its parts shear past
     // each other at different rates (§7.6 "animate sub-rings independently").
+    const spin = motion * (1 + impact * 6); // sub-rings kick on impact
     const vanes = subRefs.current['vanes'];
-    if (vanes) vanes.rotation.y += dt * 0.42 * motion;
+    if (vanes) vanes.rotation.y += dt * 0.42 * spin;
     const bolts = subRefs.current['bolts'];
-    if (bolts) bolts.rotation.y -= dt * 0.10 * motion;
+    if (bolts) bolts.rotation.y -= dt * 0.10 * spin;
     for (let i = 0; i < 3; i++) {
       const tube = subRefs.current[`tube.blue.${i}`];
-      if (tube) tube.rotation.y += dt * (0.06 + i * 0.03) * (i % 2 ? -1 : 1) * motion;
+      if (tube) tube.rotation.y += dt * (0.06 + i * 0.03) * (i % 2 ? -1 : 1) * spin;
     }
 
-    // Lens breathing on sync: a calm pulse whose depth tracks the director's sync.
+    // Impact ripple — a quick scale pop of the whole assembly, decaying with the pulse.
+    if (tiltRef.current) tiltRef.current.scale.setScalar(CORE_SCALE * (1 + impact * 0.05));
+
+    // Lens: breathing on sync, a bright flash on impact, a red tint on fail-recoil.
     if (lensMatRef.current) {
       const breathe = 1 + Math.sin(t * 1.5) * 0.16 * sync * motion;
-      const target = ready ? LENS_PEAK * (0.55 + 0.45 * sync) * breathe : 0;
+      const base = ready ? LENS_PEAK * (0.55 + 0.45 * sync) * breathe : 0;
+      const target = base + impact * LENS_PEAK * 0.9;
       lensMatRef.current.emissiveIntensity +=
-        (target - lensMatRef.current.emissiveIntensity) * (ready ? 0.06 : 0.04);
+        (target - lensMatRef.current.emissiveIntensity) * (impact > 0.01 ? 0.5 : ready ? 0.06 : 0.04);
+      const danger = sendPulse.danger;
+      lensMatRef.current.emissive.copy(lensBaseEmissive.current).lerp(DANGER, danger);
+      if (danger > 0.01) lensMatRef.current.emissiveIntensity += danger * LENS_PEAK * 0.6;
     }
   });
 

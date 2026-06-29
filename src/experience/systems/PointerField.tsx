@@ -11,8 +11,14 @@
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { pointer } from '../store';
+import { pointer, sendPulse } from '../store';
 import type { QualityTier } from '../quality';
+
+// Radius (world units) within which the send projectile shoves motes out of its
+// wake, and how hard. The push grows as the beam gathers travel (mass + follow-
+// through, SoT §5.3) so the field visibly parts as the shot crosses it.
+const WAKE_RADIUS = 1.15;
+const WAKE_PUSH = 0.9;
 
 const COUNT_BY_TIER: Record<QualityTier, number> = { A: 680, B: 420, C: 200, D: 0 };
 
@@ -73,6 +79,9 @@ export function PointerField({ tier }: { tier: QualityTier }) {
     const attr = pts.geometry.getAttribute('position') as THREE.BufferAttribute;
     const arr = attr.array as Float32Array;
     const count = arr.length / 3;
+    // Send projectile wake (SoT §5.3): the beam displaces motes it passes through.
+    const wake = sendPulse.active;
+    const wakeStrength = WAKE_PUSH * (0.4 + 0.6 * sendPulse.travel);
     for (let i = 0; i < count; i++) {
       const bx = base[i * 3];
       const by = base[i * 3 + 1];
@@ -80,10 +89,26 @@ export function PointerField({ tier }: { tier: QualityTier }) {
       // Nearer motes parallax + flow more.
       const f = THREE.MathUtils.clamp((bz + 9.5) / 11, 0.05, 1);
       const dr = drift[i];
-      arr[i * 3] = bx + pointer.x * 0.7 * f + pointer.vx * 0.12 * f + Math.sin(t * dr + phase[i]) * 0.18;
-      arr[i * 3 + 1] =
+      let x = bx + pointer.x * 0.7 * f + pointer.vx * 0.12 * f + Math.sin(t * dr + phase[i]) * 0.18;
+      let y =
         by + pointer.y * 0.7 * f + pointer.vy * 0.12 * f + Math.cos(t * dr * 0.8 + phase[i]) * 0.18;
-      arr[i * 3 + 2] = bz;
+      let z = bz;
+      if (wake) {
+        const dx = x - sendPulse.tipX;
+        const dy = y - sendPulse.tipY;
+        const dz = z - sendPulse.tipZ;
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 < WAKE_RADIUS * WAKE_RADIUS) {
+          const d = Math.sqrt(d2) || 1e-3;
+          const falloff = (1 - d / WAKE_RADIUS) * wakeStrength;
+          x += (dx / d) * falloff;
+          y += (dy / d) * falloff;
+          z += (dz / d) * falloff * 0.6;
+        }
+      }
+      arr[i * 3] = x;
+      arr[i * 3 + 1] = y;
+      arr[i * 3 + 2] = z;
     }
     attr.needsUpdate = true;
   });

@@ -28,6 +28,7 @@ import { RelayCore } from './systems/RelayCore';
 import { PointerField } from './systems/PointerField';
 import { Spheres } from './systems/Spheres';
 import { Connectors } from './systems/Connectors';
+import { SendBeam } from './systems/SendBeam';
 
 /** The master clock: integrates the inertial pointer + mirrors live state into the store. */
 function Director({ tier, sync }: { tier: QualityTier; sync: number }) {
@@ -124,6 +125,7 @@ export default function Experience({ tier, sync }: { tier: QualityTier; sync: nu
         </Suspense>
         <PointerField tier={tier} />
         <Spheres tier={tier} />
+        <SendBeam />
         <AnchorBridge debug={debugAnchor} />
         <PostFX tier={tier} />
         <PerformanceMonitor

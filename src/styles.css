@@ -2603,6 +2603,13 @@ textarea:focus-visible {
   display: none;
 }
 
+/* THE SEND (SoT §5): the WebGL SendBeam owns the send shot when the stage is live,
+   so the old DOM travelling beam (the "thin line" §0 condemned) must not double up.
+   Tier-D (no .experience-active) still shows it as the reduced/no-WebGL fallback. */
+.app-shell.experience-active .send-beam-layer {
+  display: none;
+}
+
 /* Boot veil: covers the scene area only (z-0, under the tool chrome, so the tool
    is functional underneath from frame 0). It LIFTS — never swaps for a page — the
    moment the world is ready. No spinner (SoT §4 boot). */

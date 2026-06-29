@@ -80,6 +80,7 @@ import {
 import { ExperienceMount } from './experience/ExperienceMount';
 import { useExperienceController } from './experience/quality';
 import { SceneToggle } from './experience/SceneToggle';
+import { emitSend } from './experience/store';
 
 type QueueLoadClient = AnyTextRpcClient & AnyTextFunctionsClient;
 interface SelectedAttachment {
@@ -353,8 +354,11 @@ function App() {
     }
 
     // Fire THE SEND immediately on commit — celebratory, non-blocking; the ~1s
-    // envelope never gates the actual relay (§2.5).
+    // envelope never gates the actual relay (§2.5). `triggerSendFx` drives the DOM
+    // fallback (Tier-D / reduced motion); `emitSend` drives the WebGL cinematic shot
+    // (SoT §5) when the scene is mounted (A/B/C) — a no-op otherwise.
     triggerSendFx('fire');
+    emitSend('fire');
     setCharging(true);
     setSendState('validating');
 
@@ -398,6 +402,7 @@ function App() {
       // Fail-state: beam recoils + button danger pulse once. Content is never
       // cleared (the clear only runs in the success branch above).
       triggerSendFx('recoil');
+      emitSend('recoil');
       setBackendError(getErrorMessage(error));
       setSendState('failed');
     }
@@ -1423,7 +1428,7 @@ function QueuePanel({
   }
 
   return (
-    <section className="panel workspace-panel queue-panel" ref={panelRef}>
+    <section className="panel workspace-panel queue-panel" ref={panelRef} data-scene-anchor="queue">
       <span className="panel-spotlight" aria-hidden="true" />
       <div className="panel-header">
         <div>

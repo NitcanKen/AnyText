@@ -434,8 +434,47 @@ Each phase appends to **§10 Implementation Status** (the definition of done).
 > material blue only (cyan stays reserved for remote arrival, unused in the idle deck).
 
 ### Phase 2 — THE SEND
-- [ ] Charge → volumetric beam (trail + CA + camera kick) → field displacement → core ripple → condense, one ~1s shot, anchor-bridged.
-- [ ] Fail-state recoil + danger flash; content never cleared.
+- [x] Charge → volumetric beam (trail + CA + camera kick) → field displacement → core ripple → condense, one ~1s shot, anchor-bridged.
+      — `systems/SendBeam.tsx` drives the whole gesture from **one GSAP timeline** (~1.05s)
+      tweening a single `Shot` object that `useFrame` reads (the §0 fix: one clock, not
+      `setTimeout`-chained twitches). Beats: **charge** (energy packet at the button) →
+      **fire** (tapered volumetric beam + motion-blur trail, launch chromatic-aberration
+      spike + camera kick) → **travel** (the projectile displaces `PointerField` motes in
+      its wake) → **impact** (the RelayCore ripples — lens flash, sub-rings spin up, scale
+      pop — plus an expanding shockwave ring) → **condense** (a particle burst resolves at
+      the queue). The reference's **document-chip ribbon** streams the full path **through
+      the core** (instanced lime chips). **Anchor-bridged (§3.1):** at fire it reads the
+      live `send` and `queue` DOM rects from the registry and unprojects them, so the beam
+      fires from the real button to the real queue; the path bows to the core at its
+      midpoint. New cross-system signal bus `store.ts:sendPulse` (mutable singleton, plain
+      numbers, no `three` — polled by PointerField/RelayCore/CameraRig/PostFX); discrete
+      `emitSend`/`subscribeSend` event the App fires once per commit. Content commits
+      immediately via the **unchanged** send handler (`App.tsx:sendMessage` calls
+      `emitSend('fire')` next to the existing `triggerSendFx`); the shot is non-blocking.
+      Reduced-motion compresses the timeline + drops jolts; Tier-D keeps the DOM beam
+      fallback (CSS hides it under `.experience-active`). Chromatic aberration added to
+      PostFX **imperatively** (`ChromaticAberrationEffect` via `<primitive>`) to sidestep
+      the declarative wrapper's `JSON.stringify` crash + ref-forwarding gap.
+- [x] Fail-state recoil + danger flash; content never cleared.
+      — `sendMessage`'s catch fires `emitSend('recoil')`; SendBeam kills the in-flight
+      timeline and plays a reverse, danger-tinted streak back toward the button while the
+      core flashes danger (`sendPulse.danger` → lens emissive lerps to `#f87171`). Content
+      is **never cleared on failure** — the clear lives only in the success branch — verified
+      live by forcing the backend to reject (composer kept its text, inline error + "Retry
+      send" shown, no uncaught error, scene intact). Added a `SceneErrorBoundary` around the
+      lazy canvas so a WebGL/scene error can never take the functional tool down (SoT §2.1/§2.3).
+
+> **Verification (this pass):** `npm run build` / `npm run lint` / `npm test` (34) all green;
+> the **production build** (the GitHub-Pages deliverable) renders the scene with **zero
+> console errors**; `three` stays code-split out of the critical chunk (719 KB; lazy
+> `Experience-*.js` ~1.17 MB). Per-beat captures of the slowed shot (`?shotScale` QA aid,
+> mirroring `?debugAnchor`): the beam + motion-blur trail, the lime document-chip ribbon
+> streaming through the core, and the success path (content committed, a lime queue row
+> condensed in). Fail path captured forcing a backend rejection: content preserved + error
+> surfaced. Note: the SoT's persistent `<Canvas>` + React **StrictMode** in `dev` trips a
+> pre-existing `@react-three/postprocessing` `wrapEffect` `JSON.stringify` warning on mount
+> (reproduced on the untouched Phase-1 PostFX too — not introduced here, and the new error
+> boundary now contains it); the shipped production build is unaffected.
 
 ### Phase 3 — Receiving / remote / expiry
 - [ ] Remote packet from z-depth with cyan; local vs remote distinguishable spatially + by color.

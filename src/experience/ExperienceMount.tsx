@@ -9,7 +9,7 @@
  * RelayCore literally breathes on sync (SoT §4 deck).
  */
 
-import { Suspense, lazy } from 'react';
+import { Component, Suspense, lazy, type ReactNode } from 'react';
 import { Boot } from './Boot';
 import type { QualityTier } from './quality';
 
@@ -22,12 +22,38 @@ function syncLevel(status: string): number {
   return 0.4; // disconnected/closed/error → calm, but still alive
 }
 
+/**
+ * The cinematic stage is progressive enhancement (SoT §2.3): if WebGL is lost or any
+ * scene code throws, it must NEVER take the functional tool down with it. This
+ * boundary drops the canvas on error and keeps the DOM tool — and the boot veil's own
+ * timeout (Boot.tsx) lifts the dark veil so the scene area doesn't stay a dead frame.
+ */
+class SceneErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    if (typeof console !== 'undefined') {
+      console.warn('[experience] scene disabled after error; tool stays functional:', error);
+    }
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
 export function ExperienceMount({ tier, syncStatus }: { tier: QualityTier; syncStatus: string }) {
   return (
     <>
-      <Suspense fallback={null}>
-        <LazyExperience tier={tier} sync={syncLevel(syncStatus)} />
-      </Suspense>
+      <SceneErrorBoundary>
+        <Suspense fallback={null}>
+          <LazyExperience tier={tier} sync={syncLevel(syncStatus)} />
+        </Suspense>
+      </SceneErrorBoundary>
       <Boot />
     </>
   );
