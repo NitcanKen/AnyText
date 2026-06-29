@@ -28,7 +28,7 @@
 ```
 A. MODEL GENERATION            B. OPTIMIZE/EXPORT             C. WEB INTEGRATION
    Blender (bpy script)   →      gltf-transform / Draco   →     React-three-fiber scene
-   + studio HDRI                 (compress, dedupe)             (the v2 demo, asset-backed)
+   + studio HDRI                 (compress, dedupe)             (asset-backed r3f scene)
    [optional: cloud AI-3D]       → core.glb (web-ready)         lazy-loaded, Tier-D fallback
 ```
 

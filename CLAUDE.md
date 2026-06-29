@@ -35,5 +35,6 @@ Node.js 24 recommended.
 
 ## Context
 - Active rebuild: `docs/design/anytext-living-scene-architecture.md` is the single source of truth (Cinematic WebGL Stage — one persistent r3f scene driven by a shared store; DOM tool surfaces float inside it). Read it before any experience/motion work; track completion against its §10 checklist.
+- **Visual target = ONE image:** `docs/assets/anytext-ux-annotation-integrated-v2.png` is the sole visual reference for the rebuild. There are **no reference demos** — any `living-scene*` file or archived demo is throwaway from an earlier exploration (wrong stack: vanilla three.js, crude look); never read it as a visual or code reference. Match the image + the SoT, never a demo.
 - `docs/design/anytext-tier-s-motion-scope.md` is now demoted to the **Tier‑D lite/fallback** mode + color‑discipline baseline (lime = action/yours, cyan = remote). Not the active target.
 - 3D assets are **generated, not hand‑made**: Blender headless `bpy` → Draco GLB in `public/assets/`. Toolchain is provisioned (Blender 5.1.2 + `blender` MCP on `:9876` + PolyHaven CC0 + `gltf-transform`); pipeline doc: `docs/design/anytext-3d-asset-pipeline.md`. Never hand‑edit a `.glb` — regenerate from `scripts/blender/`.
