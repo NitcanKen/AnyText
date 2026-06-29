@@ -23,3 +23,6 @@ pnpm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Generated 3D build intermediates (reproducible from build_core.py)
+scripts/blender/_build/
