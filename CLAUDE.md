@@ -1,6 +1,6 @@
 # AnyText
 
-Temporary cross-device Markdown + file relay. Static Vite app (React 19 + TypeScript + Tailwind 4) backed by Supabase (Postgres RPC, private Storage, Realtime, Edge Functions), deployed to GitHub Pages. Items are temporary and expire after one hour.
+Temporary cross-device Markdown + file relay. Static Vite app (React 19 + TypeScript + Tailwind 4) backed by Supabase (Postgres RPC, private Storage, Realtime, Edge Functions), deployed to GitHub Pages. Items are temporary and expire after one day.
 
 ## Commands
 ```bash
@@ -29,7 +29,7 @@ Node.js 24 recommended.
 ## Gotchas
 - The backend room id is `sha256(roomKey)`; the raw room key lives only in the browser and in pairing links/QR. Never log it or send the raw key to the backend.
 - `supabase/functions/` is Deno (different runtime) and is eslint-ignored — don't treat it as app code or import it from `src/`.
-- Items are temporary (one-hour expiry), not an archive — design around disappearance, not persistence.
+- Items are temporary (one-day expiry), not an archive — design around disappearance, not persistence.
 - The WebGL experience layer is progressive enhancement: it lazy-loads and must never block the functional tool or break the Tier‑D (no‑WebGL / reduced‑motion / mobile) fallback.
 - Secrets live in `.env.local` (gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Never commit real values.
 

@@ -34,7 +34,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   relayMocks.createRoom.mockResolvedValue({
     roomId: 'test-room-hash',
-    expiresPolicyMinutes: 60,
+    expiresPolicyMinutes: 1440,
   });
   relayMocks.listMessages.mockResolvedValue([]);
   relayMocks.createMessage.mockImplementation(async (_client, _roomKey, markdown: string, deviceName: string) => ({
@@ -43,7 +43,7 @@ beforeEach(() => {
     attachments: [],
     senderDeviceName: deviceName,
     createdAt: '2099-06-24T12:00:00.000Z',
-    expiresAt: '2099-06-24T13:00:00.000Z',
+    expiresAt: '2099-06-25T12:00:00.000Z',
   }));
   relayMocks.deleteMessage.mockResolvedValue(undefined);
   relayMocks.createAttachmentDownloadUrl.mockResolvedValue({
@@ -151,7 +151,7 @@ describe('AnyText Command Deck app', () => {
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /ship this/i })).not.toBeInTheDocument();
     });
-    expect(screen.getByText('No items in the last hour.')).toBeInTheDocument();
+    expect(screen.getByText('No items in the last 24 hours.')).toBeInTheDocument();
   });
 
   it('lets users disable delete confirmation from the room menu', async () => {
@@ -164,7 +164,7 @@ describe('AnyText Command Deck app', () => {
         attachments: [],
         senderDeviceName: 'MacBook',
         createdAt: '2099-06-24T12:00:00.000Z',
-        expiresAt: '2099-06-24T13:00:00.000Z',
+        expiresAt: '2099-06-25T12:00:00.000Z',
       },
     ]);
 
@@ -218,7 +218,7 @@ describe('AnyText Command Deck app', () => {
       ],
       senderDeviceName: 'MacBook',
       createdAt: '2099-06-24T12:00:00.000Z',
-      expiresAt: '2099-06-24T13:00:00.000Z',
+      expiresAt: '2099-06-25T12:00:00.000Z',
     });
 
     render(<App />);

@@ -336,3 +336,19 @@ Verification:
 - `npm run lint`, `npm test`, and `npm run build` passed; build still emits the known non-failing Tabler barrel/chunk-size warning.
 - In-app Browser verification covered page identity, nonblank Command Deck rendering, clean console, long Markdown editor internal scrolling, visible command bar and Send button, and no desktop body scroll.
 - Bundled Playwright verification covered `1440x900`, `1728x1117`, `2048x1152`, and `390x844`; long Markdown plus image/PDF upload; attachment dock and wide rail; mobile full-screen detail sheet; keyboard Tab order; reduced-motion emulation; no horizontal overflow; and no ready-state progress bars.
+
+## Decision: Item Lifetime Extended from One Hour to One Day
+
+Decided on 2026-08-27:
+
+- Queue items (messages and their attachments) now expire one day after creation instead of one hour.
+- Applied server-side in migration `20260827000000_anytext_one_day_expiry.sql`: `messages.expires_at` and `attachments.expires_at` defaults moved to `now() + interval '1 day'`, `anytext_create_message` re-created with the same interval, and `rooms.expires_policy_minutes` default moved from `60` to `1440` (already inside the existing `1..1440` check constraint).
+- Existing rows keep the one-hour deadline they were created under. Extending already-sent content would retroactively change the disappearance promise it was sent with, so the new window applies only to items created after the migration.
+- Client mirror `ITEM_LIFETIME_MS` in `src/lib/anytext.ts` holds the same one-day value; it drives local mock items only, since the server remains the authority for real queue items.
+- `formatTimeRemaining` was left unchanged: it floors whole hours, so a fresh item now reads `24h left` and counts down through `1h left`, `42m left`, `<1m left`. No day unit was added.
+- Queue empty state copy changed to `No items in the last 24 hours.`
+- The cleanup Edge Function and its schedule need no change; it deletes on `expires_at <= now()` and simply fires later per item.
+
+Verification:
+
+- `npm test` passed with 34 tests, including the updated one-day mock expiry and a new `24h left` formatter assertion.

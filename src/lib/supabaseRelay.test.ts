@@ -89,12 +89,12 @@ function makeStorageClient(dataByName: Record<string, unknown> = {}) {
 describe('Supabase RPC relay boundary', () => {
   it('creates rooms through a restricted RPC using only sha256(roomKey)', async () => {
     const client = makeRpcClient({
-      anytext_create_room: { id: roomId, expires_policy_minutes: 60 },
+      anytext_create_room: { id: roomId, expires_policy_minutes: 1440 },
     });
 
     await expect(createRoom(client, roomKey, 'MacBook')).resolves.toEqual({
       roomId,
-      expiresPolicyMinutes: 60,
+      expiresPolicyMinutes: 1440,
     });
 
     expect(client.rpc).toHaveBeenCalledWith('anytext_create_room', {

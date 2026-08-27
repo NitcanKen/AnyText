@@ -18,7 +18,7 @@ WhatsApp and Discord are too chat-shaped for moving a command, screenshot, or Ch
 
 AnyText is a lightweight cross-device relay board for developers and technical users who move Markdown, code, commands, screenshots, and files between their own devices. It is built for the small daily gap between "ChatGPT gave me something useful on this device" and "I need it on that other device now."
 
-It is not a notes app, team workspace, chat app, public file-sharing service, or long-term archive. Items are temporary, manually sent, and designed to disappear from the queue after one hour.
+It is not a notes app, team workspace, chat app, public file-sharing service, or long-term archive. Items are temporary, manually sent, and designed to disappear from the queue after one day.
 
 ## Screenshots
 
@@ -38,7 +38,7 @@ It is not a notes app, team workspace, chat app, public file-sharing service, or
 - Copy the original Markdown or copy an individual code block exactly.
 - Attach up to 10 files per message, with a 25 MB limit per file.
 - Preview common image files and download other files through scoped signed URLs.
-- Keep a temporary room queue with realtime updates, manual delete, and one-hour expiry.
+- Keep a temporary room queue with realtime updates, manual delete, and one-day expiry.
 - Run as a static Vite app on GitHub Pages with Supabase for Postgres, Storage, and Realtime.
 
 ## Current Status
@@ -89,7 +89,7 @@ AnyText uses a lightweight shared-secret room model, not an account system.
 - The app is not end-to-end encrypted.
 - Supabase project administrators can access stored message text and files.
 - Do not use AnyText for passwords, private keys, legal/medical secrets, or long-term sensitive storage.
-- Message rows and attachments are designed around one-hour expiry and manual deletion.
+- Message rows and attachments are designed around one-day expiry and manual deletion.
 
 ## Tech Stack
 

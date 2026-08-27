@@ -150,7 +150,7 @@ Queue item collapsed state:
 
 - Sender device.
 - Created time.
-- Time remaining, for example `1h left`.
+- Time remaining, for example `24h left` or `1h left`.
 - Markdown excerpt.
 - Attachment count.
 - Optional type indicators for image/file.

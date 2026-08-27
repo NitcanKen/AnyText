@@ -250,7 +250,7 @@ Expiry should be visible but not stressful.
 
 Display:
 
-- `1h left`, `42m left`, `5m left`.
+- `24h left`, `1h left`, `42m left`, `5m left`.
 - Optional thin remaining-time hairline.
 
 When expired:
@@ -342,7 +342,7 @@ Realtime disconnected:
 Empty queue:
 
 - Short and functional.
-- Example: `No items in the last hour.`
+- Example: `No items in the last 24 hours.`
 - Avoid long onboarding text.
 
 Loading:

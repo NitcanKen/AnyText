@@ -1555,7 +1555,7 @@ function EmptyQueue() {
   return (
     <div className="p-3">
       <div className="rounded-md border border-dashed border-white/10 bg-black/10 p-5 text-sm text-slate-400">
-        No items in the last hour.
+        No items in the last 24 hours.
       </div>
     </div>
   );

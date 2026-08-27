@@ -8,6 +8,9 @@ export const ATTACHMENT_LIMITS = {
 export const ROOM_KEY_SYMBOLS = '!@#$%^&*';
 export const ROOM_KEY_PATTERN = /^\d{6}[!@#$%^&*]$/;
 
+/** Item lifetime: one day. Must stay in sync with the server-side expiry interval. */
+export const ITEM_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
 export type AttachmentPreviewKind = 'image' | 'download';
 
 export interface QueueAttachment {
@@ -125,7 +128,7 @@ export function createMockQueueItem(input: {
   id?: string;
 }): QueueItem {
   const createdAt = input.now ?? new Date();
-  const expiresAt = new Date(createdAt.getTime() + 60 * 60 * 1000);
+  const expiresAt = new Date(createdAt.getTime() + ITEM_LIFETIME_MS);
   const id = input.id ?? createId();
 
   return {

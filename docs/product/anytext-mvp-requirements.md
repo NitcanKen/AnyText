@@ -47,11 +47,11 @@ Primary user:
 ### Queue Model
 
 - Content appears in a temporary queue.
-- Queue keeps items for 1 hour.
+- Queue keeps items for 1 day.
 - Multiple items can exist at the same time.
 - New items do not overwrite old items.
 - Any paired device can manually delete a queue item.
-- Items expire automatically after 1 hour.
+- Items expire automatically after 1 day.
 
 ### Message Structure
 
@@ -130,7 +130,7 @@ MVP uses a lightweight shared secret model.
 
 Baseline safety requirements:
 
-- 1-hour automatic expiry.
+- 1-day automatic expiry.
 - Manual delete.
 - Random, hard-to-guess storage paths.
 - Sanitized Markdown rendering.
@@ -154,5 +154,5 @@ The MVP is successful if:
 - A command block can be copied individually without selecting surrounding text.
 - A screenshot or image can be sent and previewed.
 - A document can be sent and downloaded.
-- Multiple recent items can coexist in the queue for 1 hour.
+- Multiple recent items can coexist in the queue for 1 day.
 - The app feels much lighter than opening Notion, Discord, WhatsApp, or email.

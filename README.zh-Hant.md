@@ -18,7 +18,7 @@ WhatsApp 和 Discord 太像聊天工具，不適合只為了把一段 command、
 
 AnyText 是一個輕量的跨裝置 relay board，面向開發者和技術使用者。它解決的是很小但很常見的日常斷點：ChatGPT 或某個工具在這部裝置給了你一段 Markdown、命令、截圖或檔案，但你現在需要在另一部自己的裝置上使用。
 
-它不是筆記工具、團隊工作區、聊天工具、公開檔案分享服務或長期資料庫。內容需要手動送出，會進入臨時 queue，並在 1 小時後從 queue 隱藏。
+它不是筆記工具、團隊工作區、聊天工具、公開檔案分享服務或長期資料庫。內容需要手動送出，會進入臨時 queue，並在 1 日後從 queue 隱藏。
 
 ## 截圖
 
@@ -38,7 +38,7 @@ AnyText 是一個輕量的跨裝置 relay board，面向開發者和技術使用
 - 可複製原始 Markdown，也可單獨精準複製每個 code block。
 - 每則訊息最多 10 個附件，每個附件最多 25 MB。
 - 常見圖片格式可預覽；其他檔案以 signed URL 下載。
-- Queue 支援 realtime 更新、手動刪除與 1 小時過期。
+- Queue 支援 realtime 更新、手動刪除與 1 日過期。
 - 前端以 GitHub Pages 靜態部署，後端使用 Supabase Postgres、Storage 和 Realtime。
 
 ## 目前狀態
@@ -89,7 +89,7 @@ AnyText 使用輕量 shared-secret room model，不是帳戶系統。
 - AnyText 不是 end-to-end encrypted。
 - Supabase project administrators 理論上可以讀取儲存中的文字與檔案。
 - 不要用 AnyText 傳送密碼、private keys、法律/醫療秘密，或任何需要長期保護的敏感資料。
-- 訊息和附件以 1 小時過期、手動刪除和 cleanup 流程為核心。
+- 訊息和附件以 1 日過期、手動刪除和 cleanup 流程為核心。
 
 ## 技術棧
 

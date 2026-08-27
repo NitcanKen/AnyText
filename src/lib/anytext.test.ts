@@ -93,7 +93,7 @@ describe('AnyText validation helpers', () => {
 });
 
 describe('AnyText expiry and queue helpers', () => {
-  it('creates mock queue items with one-hour expiry and sorted active queue', () => {
+  it('creates mock queue items with one-day expiry and sorted active queue', () => {
     const now = new Date('2026-06-24T12:00:00.000Z');
     const old = createMockQueueItem({
       markdown: 'older',
@@ -108,7 +108,7 @@ describe('AnyText expiry and queue helpers', () => {
       id: 'new',
     });
 
-    expect(old.expiresAt).toBe('2026-06-24T13:00:00.000Z');
+    expect(old.expiresAt).toBe('2026-06-25T12:00:00.000Z');
     expect(getActiveQueueItems([old, newer], now).map((item) => item.id)).toEqual(['new', 'old']);
   });
 
@@ -124,6 +124,7 @@ describe('AnyText expiry and queue helpers', () => {
   it('formats time remaining and expired state', () => {
     const now = new Date('2026-06-24T12:00:00.000Z');
 
+    expect(formatTimeRemaining('2026-06-25T12:00:00.000Z', now)).toBe('24h left');
     expect(formatTimeRemaining('2026-06-24T13:00:00.000Z', now)).toBe('1h left');
     expect(formatTimeRemaining('2026-06-24T13:01:00.000Z', now)).toBe('1h left');
     expect(formatTimeRemaining('2026-06-24T12:42:00.000Z', now)).toBe('42m left');
