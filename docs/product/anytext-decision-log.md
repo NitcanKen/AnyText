@@ -16,7 +16,7 @@ This document records product and design decisions already aligned with the user
 - Device pairing happens once per device through QR code or pairing code.
 - Repeated QR scan for every transfer is not acceptable.
 - Room key is saved in browser `localStorage`.
-- Queue items expire after 1 hour.
+- Queue items expire after 1 day.
 - Queue can contain multiple items.
 - Any paired device can manually delete a queue item.
 - A message can include Markdown text plus multiple attachments.
@@ -282,7 +282,7 @@ Implemented on 2026-06-25:
 
 Reason for spec deviation:
 
-- This intentionally trades high entropy for much lower device-join friction. AnyText remains scoped to temporary, low-sensitivity transfer with one-hour expiry, manual delete, and no end-to-end encryption.
+- This intentionally trades high entropy for much lower device-join friction. AnyText remains scoped to temporary, low-sensitivity transfer with one-day expiry, manual delete, and no end-to-end encryption.
 
 ## Implementation Note: UX Polish Publish Gating
 
@@ -352,3 +352,13 @@ Decided on 2026-08-27:
 Verification:
 
 - `npm test` passed with 34 tests, including the updated one-day mock expiry and a new `24h left` formatter assertion.
+
+## Decision: Remove Cinematic WebGL Background
+
+Decided on 2026-08-31:
+
+- Remove the cinematic WebGL background, including the relay core, spheres, connectors, send-beam scene, and `SCENE · AUTO` toggle.
+- Restore the uncluttered Command Deck presentation with its original CSS ambient field.
+- Remove the `src/experience` runtime and its Three.js, React Three Fiber, GSAP, Lenis, postprocessing, and Zustand dependencies.
+- Keep the one-day expiry policy and all relay behavior unchanged.
+- Retain the living-scene and 3D-pipeline documents only as retired historical records; they are no longer implementation instructions.

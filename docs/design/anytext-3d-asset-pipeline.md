@@ -1,5 +1,8 @@
 # AnyText — 3D Asset Pipeline & Provisioning Spec
 
+> **Status:** Archived on 2026-08-31. The WebGL background was removed from
+> production at the user's request. Retained only as a historical build record.
+>
 > **Purpose:** what must be installed/configured so Claude can **generate** the hero
 > "relay core" 3D asset (plus supporting models/HDRI) and build the real‑time scene
 > to ~100% match `docs/assets/anytext-ux-annotation-integrated-v2.png`.

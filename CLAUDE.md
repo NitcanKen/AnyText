@@ -22,7 +22,7 @@ Node.js 24 recommended.
 
 ## Conventions
 - Put visual styling in `src/styles.css` via CSS custom properties + `@layer components`. Don't scatter Tailwind utility soup across JSX or add CSS-in-JS.
-- CSS/DOM animations: only `transform` / `opacity`, each with a `prefers-reduced-motion` fallback. (The WebGL experience layer animates via its render loop — governed by the architecture doc, not this rule.)
+- CSS/DOM animations: only `transform` / `opacity`, each with a `prefers-reduced-motion` fallback.
 - Two accent colors only: `--accent` (lime = action / live / yours) and `--accent-cyan` (remote arrival). Never add a third accent.
 - Render all user Markdown through `MarkdownPreview` (react-markdown + `rehypeSanitize`). IMPORTANT: never use `dangerouslySetInnerHTML` or disable sanitization — relay content is untrusted.
 
@@ -30,12 +30,9 @@ Node.js 24 recommended.
 - The backend room id is `sha256(roomKey)`; the raw room key lives only in the browser and in pairing links/QR. Never log it or send the raw key to the backend.
 - `supabase/functions/` is Deno (different runtime) and is eslint-ignored — don't treat it as app code or import it from `src/`.
 - Items are temporary (one-day expiry), not an archive — design around disappearance, not persistence.
-- The WebGL experience layer is progressive enhancement: it lazy-loads and must never block the functional tool or break the Tier‑D (no‑WebGL / reduced‑motion / mobile) fallback.
 - Secrets live in `.env.local` (gitignored): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. Never commit real values.
 
 ## Context
-- Active rebuild: `docs/design/anytext-living-scene-architecture.md` is the single source of truth (Cinematic WebGL Stage — one persistent r3f scene driven by a shared store; DOM tool surfaces float inside it). Read it before any experience/motion work; track completion against its §10 checklist.
-- **Visual target = ONE image:** `docs/assets/anytext-ux-annotation-integrated-v2.png` is the sole visual reference for the rebuild. There are **no reference demos** — any `living-scene*` file or archived demo is throwaway from an earlier exploration (wrong stack: vanilla three.js, crude look); never read it as a visual or code reference. Match the image + the SoT, never a demo.
-- **Full UI/UX teardown — discard the old surface, keep only the wiring:** this rebuild replaces the *entire presentation layer* of the current app. The existing layout, components, and styling are **not** a visual or structural reference — never patch, mimic, or preserve their appearance. What carries over is the *functional* layer only: `src/lib/*`, the Supabase contract, and `src/App.tsx`'s handlers / state / events (send, upload, download, realtime arrival, expiry, pairing, sanitize). Read the current UI solely to learn that wiring, then rebuild every surface from scratch to match the image. Tests assert behavior, not old layout.
-- `docs/design/anytext-tier-s-motion-scope.md` is now demoted to the **Tier‑D lite/fallback** mode + color‑discipline baseline (lime = action/yours, cyan = remote). Not the active target.
-- 3D assets are **generated, not hand‑made**: Blender headless `bpy` → Draco GLB in `public/assets/`. Toolchain is provisioned (Blender 5.1.2 + `blender` MCP on `:9876` + PolyHaven CC0 + `gltf-transform`); pipeline doc: `docs/design/anytext-3d-asset-pipeline.md`. Never hand‑edit a `.glb` — regenerate from `scripts/blender/`.
+- The Cinematic WebGL experiment was removed from production on 2026-08-31. Do not reintroduce a canvas, 3D background, scene toggle, or related runtime dependencies unless the user explicitly requests them.
+- `docs/design/anytext-living-scene-architecture.md` and `docs/design/anytext-3d-asset-pipeline.md` are retained as retired historical design records, not active implementation guidance.
+- The current Command Deck UI and CSS ambient field are the production presentation baseline. Preserve the functional relay wiring and the uncluttered background.

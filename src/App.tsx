@@ -77,10 +77,6 @@ import {
   type AnyTextRpcClient,
   type RealtimeStatus,
 } from './lib/supabaseRelay';
-import { ExperienceMount } from './experience/ExperienceMount';
-import { useExperienceController } from './experience/quality';
-import { SceneToggle } from './experience/SceneToggle';
-import { emitSend } from './experience/store';
 
 type QueueLoadClient = AnyTextRpcClient & AnyTextFunctionsClient;
 interface SelectedAttachment {
@@ -103,7 +99,6 @@ type SendFx = { id: number; phase: 'fire' | 'recoil' };
 const DELETE_CONFIRMATION_STORAGE_KEY = 'anytext.confirmDeleteMessage';
 
 function App() {
-  const experience = useExperienceController();
   const [roomKey, setRoomKey] = useState(getInitialRoomKey);
   const [roomId, setRoomId] = useState('');
   const [deviceName, setDeviceName] = useState(getInitialDeviceName);
@@ -354,11 +349,8 @@ function App() {
     }
 
     // Fire THE SEND immediately on commit — celebratory, non-blocking; the ~1s
-    // envelope never gates the actual relay (§2.5). `triggerSendFx` drives the DOM
-    // fallback (Tier-D / reduced motion); `emitSend` drives the WebGL cinematic shot
-    // (SoT §5) when the scene is mounted (A/B/C) — a no-op otherwise.
+    // envelope never gates the actual relay (§2.5).
     triggerSendFx('fire');
-    emitSend('fire');
     setCharging(true);
     setSendState('validating');
 
@@ -402,7 +394,6 @@ function App() {
       // Fail-state: beam recoils + button danger pulse once. Content is never
       // cleared (the clear only runs in the success branch above).
       triggerSendFx('recoil');
-      emitSend('recoil');
       setBackendError(getErrorMessage(error));
       setSendState('failed');
     }
@@ -503,16 +494,7 @@ function App() {
   }
 
   return (
-    <div
-      className={cx(
-        'app-shell text-slate-100',
-        experience.active ? 'experience-active' : 'bg-[#070a0c]',
-      )}
-    >
-      {experience.active ? (
-        <ExperienceMount syncStatus={syncStatus} tier={experience.tier} />
-      ) : null}
-      <SceneToggle controller={experience} />
+    <div className="app-shell bg-[#070a0c] text-slate-100">
       <AmbientField energizedSignal={sendFx?.phase === 'fire' ? sendFx.id : undefined} />
       <GrainField />
       <SendBeam fx={sendFx} />
@@ -1213,7 +1195,6 @@ function Composer({
               !sendDisabled && sendState === 'draft_ready' && 'send-button-ready',
               sendState === 'sent' && 'send-button-sent',
             )}
-            data-scene-anchor="send"
             disabled={sendDisabled}
             onClick={onSend}
             ref={sendButtonRef}
@@ -1428,7 +1409,7 @@ function QueuePanel({
   }
 
   return (
-    <section className="panel workspace-panel queue-panel" ref={panelRef} data-scene-anchor="queue">
+    <section className="panel workspace-panel queue-panel" ref={panelRef}>
       <span className="panel-spotlight" aria-hidden="true" />
       <div className="panel-header">
         <div>

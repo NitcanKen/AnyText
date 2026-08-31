@@ -1,6 +1,9 @@
 # AnyText — Living Scene Architecture (Cinematic WebGL Stage)
 
-> **Status:** Active single source of truth for the experience rebuild.
+> **Status:** Retired on 2026-08-31. The WebGL runtime, scene toggle, and related
+> dependencies were removed from production at the user's request. This document
+> is a historical design record and must not be treated as active implementation
+> guidance unless the user explicitly revives the direction.
 > **Supersedes:** the *experience/motion* portions of
 > [`anytext-tier-s-motion-scope.md`](./anytext-tier-s-motion-scope.md). That doc's
 > CSS deck is **retained, not deleted** — it becomes the **Tier-D lite/fallback
